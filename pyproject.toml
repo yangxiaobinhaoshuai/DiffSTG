@@ -1,0 +1,15 @@
+[project]
+name = "raw-diffstg"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "easydict>=1.13",
+    "matplotlib>=3.11.1",
+    "nni>=3.0",
+    "numpy>=2.4.6",
+    "pandas>=3.0.5",
+    "scipy>=1.17.1",
+    "torch>=2.13.0",
+]
