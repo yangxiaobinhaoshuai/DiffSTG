@@ -3,7 +3,7 @@ name = "raw-diffstg"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.12"
 dependencies = [
     "easydict>=1.13",
     "matplotlib>=3.11.1",
@@ -11,5 +11,13 @@ dependencies = [
     "numpy>=2.4.6",
     "pandas>=3.0.5",
     "scipy>=1.17.1",
-    "torch>=2.13.0",
+    "torch==2.11.0",
 ]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
