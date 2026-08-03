@@ -50,15 +50,25 @@ def get_params():
     parser.add_argument("--is_train", type=bool, default=True) # train or evaluate
     parser.add_argument("--data", type=str, default='PEMS08')
     parser.add_argument("--mask_ratio", type=float, default=0.0) # mask of history data
-    parser.add_argument("--is_test", type=bool, default=True)
+    parser.add_argument(
+        "--is_test",
+        action="store_true",
+        help="Run only a few batches and epochs for debugging",
+    )
     parser.add_argument("--nni", type=bool, default=False)
     parser.add_argument("--lr", type=float, default=0.002)
     parser.add_argument("--batch_size", type=int, default=8)
+    parser.add_argument(
+        "--gpu",
+        type=int,
+        default=None,
+        help="CUDA device index; automatically select a GPU when omitted",
+    )
 
     args, _ = parser.parse_known_args()
     return args
 
-def default_config(data='AIR_BJ'):
+def default_config(data='AIR_BJ', gpu_id=None):
     config = edict()
     config.PATH_MOD = ws + '/output/model/'
     config.PATH_LOG = ws + '/output/log/'
@@ -94,12 +104,18 @@ def default_config(data='AIR_BJ'):
         config.data.val_start_idx = int(8760 * 10 / 12) #
         config.data.test_start_idx = int(8160 * 11 / 12)
 
-    gpu_id = GPU().get_usefuel_gpu(max_memory=6000, condidate_gpu_id=[0,1,2,3,4,6,7,8])
+    if gpu_id is None:
+        gpu_id = GPU().get_usefuel_gpu(
+            max_memory=6000,
+            condidate_gpu_id=list(range(torch.cuda.device_count())),
+        )
     config.gpu_id = gpu_id
-    if gpu_id != None:
+    if gpu_id is not None:
         cuda_id = GpuId2CudaId(gpu_id)
         torch.cuda.set_device(f"cuda:{cuda_id}")
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = torch.device(f"cuda:{cuda_id}")
+    else:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # model config
     config.model = edict()
@@ -248,7 +264,7 @@ def main(params: dict):
     # torch.manual_seed(2022)
     setup_seed(2022)
     torch.set_num_threads(2)
-    config = default_config(params['data'])
+    config = default_config(params['data'], params['gpu'])
 
     config.is_test = params['is_test']
     config.nni = params['nni']
