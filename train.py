@@ -64,6 +64,14 @@ def get_params():
         default=None,
         help="CUDA device index; automatically select a GPU when omitted",
     )
+    parser.add_argument(
+        "--start_epoch",
+        type=int,
+        default=0,
+        help="Skip validation before this epoch to save time; safe w.r.t. "
+             "best-checkpoint/scheduler/early-stop since Metric.best_metrics['epoch'] "
+             "starts at inf",
+    )
 
     args, _ = parser.parse_known_args()
     return args
@@ -271,6 +279,7 @@ def main(params: dict):
     config.lr = params['lr']
     config.batch_size = params['batch_size']
     config.mask_ratio = params['mask_ratio']
+    config.start_epoch = params['start_epoch']
 
     # model
     config.model.N = params['N']
@@ -362,6 +371,7 @@ def main(params: dict):
 
         n, avg_loss, time_lst = 0, 0, []
         # train diffusion model
+        model.train()  # evals() below switches to eval() mode and nothing else restores it
         for i, batch in enumerate(train_loader):
             if i > 3 and config.is_test:break
             time_start =  timer()
