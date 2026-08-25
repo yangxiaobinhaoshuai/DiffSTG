@@ -23,6 +23,10 @@ dist/
 
 # Project-generated training artifacts
 output/
+output_remote/
+
+# Machine-local remote-dev config (SSH host, paths) — see scripts/remote_dev.sh
+.remote-dev.env
 
 # IDE and operating-system files
 .idea/
