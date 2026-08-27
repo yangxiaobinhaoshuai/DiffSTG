@@ -1,0 +1,18 @@
+[INFO] dataset=PEMS08 start_epoch=20 gpu=0 max_hours=48
+[INFO] seeds=2022 2023 2024
+[INFO] runner=uv run --frozen --no-sync python
+[INFO] commit=e19ccbd
+[INFO] raw_log=output/log/run_3seeds_PEMS08_start20_20260827-185932.log
+[INFO] started at 2026-08-27T18:59:32+0800
+
+[INFO] === preflight ===
+[OK] data/dataset/PEMS08/flow.npy
+[OK] data/dataset/PEMS08/adj.npy
+[OK] timeout=/usr/bin/timeout
+
+[INFO] === smoke test (--is_test) ===
+[OK] smoke test passed at 2026-08-27T19:00:05+0800
+
+[INFO] === seeds ===
+
+[INFO] seed=2022 started at 2026-08-27T19:00:05+0800
