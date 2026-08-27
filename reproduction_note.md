@@ -205,8 +205,45 @@ git pull
 - **没结果就不关机**：关机是为了长跑结束后不空烧 GPU，但"什么都没跑出来"时关机只会把
   报错连同机器一起带走，只能重新开机翻日志。所以 preflight/冒烟失败、或三个 seed 在
   1 小时内全挂，都保持开机且不 commit。
-- **关机可验证**：`shutdown -h +1` 留一分钟 `shutdown -c` 的窗口；`shutdown` 是异步返回的，
-  所以额外 sleep 5 分钟确认真的关掉了，没关掉才退回 `poweroff`。
+- **AutoDL 上没有"定时关机"这回事**：host 的 `/usr/bin/shutdown` 不是 systemd 的 shutdown，
+  是 AutoDL 塞进来的三行脚本，**忽略全部参数**直接 kill supervisord 关掉容器。因此
+  `shutdown -h +30` 是立刻关机，`shutdown --help` 是立刻关机，连 `shutdown -c` 也是立刻关机。
+  2026-08-27 就因此被误关了两次（一次是脚本的 `shutdown -h +1`，一次是 agent 执行
+  `shutdown --help` 探测）。**任何人和 agent 都不要在这台机器上敲关机命令**，
+  `.claude/hooks/block-poweroff.sh` 已经把 agent 这条路堵死。
+- **`output/last_run.json`（固定路径，纳入 git）**：回答"上次为什么关机"。字段有
+  `status`（running/preflight_failed/smoke_failed/seed_failed/success）、`shutdown`
+  （pending/skipped/cancelled/poweroff）、`exit_status`、`seeds`/`failed_seeds`、
+  `started`/`finished`、`code_commit`/`results_commit`、summary 与 raw log 路径、
+  checkpoint 列表。**每个阶段边界都重写一次**（不是只在收尾写一次）：2026-08-27 那次
+  raw transcript 停在 seed 2022 的中途、已提交的 summary log 停在"seed=2022 started"，
+  但 commit message 里却算出了 `failed: 2022 2023 2024` —— 结论行确实丢了，
+  丢失的确切机制没查清，所以不再依赖"跑完写一次"这个单点。
+  写法是临时文件 + `mv` + `sync`，中断也不会留下半个 JSON。
+  `status` 仍是 `running` 且 `finished` 为 null，就代表上次是被外力打断的
+  （控制台关机 / OOM / 被 kill / 余额耗尽），脚本自己关机绝不会留下这个组合。
+- **登录即见**：`scripts/last_run_banner.sh` 由 `~/.bashrc` source，交互式 shell 一进来
+  就打印一行 `last run` 摘要（success 绿、其余红）。开机 ssh 上来第一眼就知道上次是成还是败。
+- **`.last.dm4stg` 兜底 checkpoint**：`train.py` 里 best checkpoint 只在验证变好时写，而
+  `--start_epoch 20` 意味着第 20 epoch 之前根本不验证 —— 早期崩溃会两手空空。现在每个 epoch
+  都额外写一份 `<trial>.last.dm4stg`（临时文件 + `os.replace`，写一半也不会毁掉上一份）。
+  它**不参与** best 选择，测试阶段仍然只加载 best checkpoint，复现指标不受影响。
+- **文件名缩短**：`trial_name` 原本是把全部参数值用 `+` 拼起来（~90 字符、无标签），
+  加上 `model_file_name()` 的尾巴一共 ~135 字符，`ls` 里完全没法读。现在是
+  `PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se20_e300_s2022_0588d5`：常看的旋钮带标签，
+  末尾 6 位是**全部参数**的 blake2b 摘要，所以扫别的超参也不会撞名（`gpu`/`nni` 不进摘要，
+  它们只影响在哪跑、不影响算什么）。冒烟跑加 `test_` 前缀。完整参数照旧在
+  `output/metrics/DiffSTG.csv`。mae 标注的那份日志副本改名为 `<trial>.mae345.56.log`。
+  改名前后 smoke test 的 mae 都是 345.55786，未扰动结果。
+- **关机窗口改成脚本自己 sleep**：跑完后先打印 result 状态、summary 与原始 transcript 路径并
+  `sync`，然后在脚本里真等 `SHUTDOWN_GRACE_MINUTES`（默认 30，每 5 分钟播报一次剩余时间，
+  0 表示立即关机），到点才调一次 `shutdown -h now`。取消有两条路：tmux 里 Ctrl-C，
+  或者 `touch output/.cancel_shutdown`（detach 之后也能用）。取消后脚本退出、机器保持开机。
+
+仓库里两个碍眼的文件：`cache.db` 是 autodl-proxy 的 sing-box 写的 bbolt 缓存
+（`experimental.cache_file` 没设 `path`，就落在 `proxy_on` 当时的 cwd 里），与本仓库无关；
+`*.orig` 是 `git pull --rebase` 冲突留下的备份。两者都已进 `.gitignore`，
+根治办法是给 `/etc/autodl-proxy/*.json` 的 `cache_file` 加绝对 `path`。
 
 已知缺口：没有 resume。训练中途崩溃只能从头再来（best checkpoint 仍在盘上）。
 考虑到 early stop 会把实际 epoch 数压到远低于 300，且 resume 逻辑本身有写错、

@@ -11,6 +11,7 @@
 #   SKIP_SMOKE=0            1 skips the --is_test end-to-end check
 #   COMMIT_RESULTS=1        0 skips the host-local git commit of output/
 #   NO_SHUTDOWN=0           1 keeps the host up after the run
+#   SHUTDOWN_GRACE_MINUTES=30  real countdown before power off; 0 powers off at once
 #   SHUTDOWN_ON_EARLY_FAIL=0  1 powers off even when nothing usable came out
 #                             (preflight/smoke failed, or every seed failed within
 #                             an hour). Default keeps the host up to stay debuggable.
@@ -23,6 +24,7 @@ dataset="${DATASET:-PEMS08}"
 start_epoch="${START_EPOCH:-20}"
 gpu="${GPU:-0}"
 max_hours="${MAX_HOURS:-48}"
+shutdown_grace_minutes="${SHUTDOWN_GRACE_MINUTES:-30}"
 [[ "$max_hours" == "0" ]] && max_hours=8760
 read -r -a seeds <<< "${SEEDS:-2022 2023 2024}"
 read -r -a py_runner <<< "${PY_RUNNER:-uv run --frozen --no-sync python}"
@@ -34,6 +36,9 @@ run_tag="${dataset}_start${start_epoch}_${run_stamp}"
 # huge line). summary_log holds only the lines below and is tracked by git.
 run_log="output/log/run_3seeds_${run_tag}.log"
 summary_log="output/log/summary_3seeds_${run_tag}.log"
+# state_file is the fixed-path answer to "why did the host go down last time?".
+# It is tracked by git (see .gitignore) so it also reaches the laptop on pull.
+state_file="output/last_run.json"
 
 mkdir -p output/log output/model output/forecast output/metrics || exit 1
 exec > >(tee -a "$run_log") 2>&1
@@ -42,6 +47,57 @@ now() { date +%Y-%m-%dT%H:%M:%S%z; }
 hms() { printf '%02d:%02d:%02d' $(($1 / 3600)) $(($1 % 3600 / 60)) $(($1 % 60)); }
 # say: to the tmux pane + raw transcript + the tracked summary log
 say() { printf "$@" | tee -a "$summary_log"; }
+
+# ---- last_run.json ---------------------------------------------------------
+# Rewritten at every phase boundary rather than once at the end: on 2026-08-27
+# both the raw transcript and the committed summary log lost their tails around
+# the power-off, so a single end-of-run write is not something to rely on.
+# run_state:      running | preflight_failed | smoke_failed | seed_failed | success
+# shutdown_state: pending | skipped | cancelled | poweroff
+run_state="running"
+shutdown_state="pending"
+started_at="$(now)"
+head_commit="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+results_commit=""
+
+json_escape() { printf '%s' "${1-}" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+json_str() { printf '"%s"' "$(json_escape "${1-}")"; }
+# json_or_null <value>: quoted string, or null when empty
+json_or_null() { if [[ -n "${1-}" ]]; then json_str "$1"; else printf 'null'; fi; }
+json_arr() {
+  local out="" x
+  for x in "$@"; do out="${out:+$out, }$(json_str "$x")"; done
+  printf '[%s]' "$out"
+}
+
+# write_state: temp file + rename + sync, so an interrupted write can never
+# leave a truncated or half-parsed state file behind.
+write_state() {
+  local finished="" tmp="${state_file}.tmp"
+  [[ "$run_state" != "running" ]] && finished="$(now)"
+  {
+    printf '{\n'
+    printf '  "schema": 1,\n'
+    printf '  "status": %s,\n' "$(json_str "$run_state")"
+    printf '  "shutdown": %s,\n' "$(json_str "$shutdown_state")"
+    printf '  "exit_status": %s,\n' "${run_status:-null}"
+    printf '  "run_tag": %s,\n' "$(json_str "$run_tag")"
+    printf '  "dataset": %s,\n' "$(json_str "$dataset")"
+    printf '  "start_epoch": %s,\n' "$start_epoch"
+    printf '  "seeds": %s,\n' "$(json_arr "${seeds[@]}")"
+    printf '  "failed_seeds": %s,\n' "$(json_arr ${failed[@]+"${failed[@]}"})"
+    printf '  "started": %s,\n' "$(json_str "$started_at")"
+    printf '  "finished": %s,\n' "$(json_or_null "$finished")"
+    printf '  "code_commit": %s,\n' "$(json_str "$head_commit")"
+    printf '  "results_commit": %s,\n' "$(json_or_null "$results_commit")"
+    printf '  "summary_log": %s,\n' "$(json_str "$repo_root/$summary_log")"
+    printf '  "raw_log": %s,\n' "$(json_str "$repo_root/$run_log")"
+    printf '  "checkpoints": %s\n' "$(json_arr $(ls -1 output/model/*.dm4stg 2>/dev/null))"
+    printf '}\n'
+  } > "$tmp"
+  mv -f "$tmp" "$state_file"
+  sync
+}
 
 timeout_bin="$(command -v timeout || command -v gtimeout || true)"
 # run_with_timeout <hours> <cmd...>; runs unbounded if coreutils timeout is absent
@@ -62,6 +118,9 @@ say '[INFO] runner=%s\n' "${py_runner[*]}"
 say '[INFO] commit=%s\n' "$(git rev-parse --short HEAD 2>/dev/null || echo 'not a git repo')"
 say '[INFO] raw_log=%s\n' "$run_log"
 say '[INFO] started at %s\n' "$(now)"
+failed=()
+seeds_ran=0
+write_state
 
 # ---- preflight: fail in seconds, not in days -------------------------------
 say '\n[INFO] === preflight ===\n'
@@ -104,6 +163,8 @@ fi
 if (( ! preflight_ok )); then
   say '\n[FAIL] preflight failed; nothing was trained.\n'
   run_status=1
+  run_state="preflight_failed"
+  write_state
 else
   # ---- smoke test: exercises save -> load -> ddim test -> CRPS/MIS -> csv ---
   # Needs --start_epoch 0, otherwise validation never runs, no checkpoint is
@@ -120,13 +181,13 @@ else
     else
       say '[FAIL] smoke test failed (status %s); skipping the real run.\n' "$?"
       run_status=1
+      run_state="smoke_failed"
+      write_state
     fi
   fi
 fi
 
 # ---- seeds -----------------------------------------------------------------
-failed=()
-seeds_ran=0
 if (( run_status == 0 )); then
   seeds_ran=1
   say '\n[INFO] === seeds ===\n'
@@ -159,6 +220,7 @@ if (( run_status == 0 )); then
         "$seed" "$(now)" "$(hms "$elapsed")"
       failed+=("$seed")
     fi
+    write_state
   done
   (( ${#failed[@]} )) && run_status=1
 fi
@@ -170,9 +232,12 @@ if (( ! seeds_ran )); then
   say '[FAIL] seeds never started; preflight or smoke test blocked the run.\n'
 elif (( ${#failed[@]} )); then
   say '[FAIL] failed seeds: %s (of %s)\n' "${failed[*]}" "${seeds[*]}"
+  run_state="seed_failed"
 else
   say '[OK] all seeds completed: %s\n' "${seeds[*]}"
+  run_state="success"
 fi
+write_state
 say '[INFO] last rows of %s:\n' "$csv"
 tail -n $(( ${#seeds[@]} + 1 )) "$csv" 2>/dev/null | tee -a "$summary_log" \
   || say '[FAIL] %s missing\n' "$csv"
@@ -199,7 +264,8 @@ elif ! git rev-parse --git-dir >/dev/null 2>&1; then
   say '\n[WARN] not a git repo; results left uncommitted under output/.\n'
 else
   say '\n[INFO] === commit results ===\n'
-  git add -A -- output/metrics output/log
+  write_state
+  git add -A -- output/metrics output/log "$state_file"
   if git diff --cached --quiet; then
     say '[WARN] nothing to commit under output/.\n'
   else
@@ -214,8 +280,9 @@ else
     fi
     commit_status=$?
     if (( commit_status == 0 )); then
+      results_commit="$(git rev-parse --short HEAD)"
       say '[OK] results committed as %s on %s\n' \
-        "$(git rev-parse --short HEAD)" "$(git rev-parse --abbrev-ref HEAD)"
+        "$results_commit" "$(git rev-parse --abbrev-ref HEAD)"
       say '[INFO] not pushed by design; run `git push` after powering the host back on.\n'
     else
       say '[FAIL] git commit failed; results are still on disk under output/.\n'
@@ -229,9 +296,10 @@ say '[INFO] checkpoints and forecast pickles stay on this host (gitignored).\n'
 # Only power off once the real seeds have started. A preflight/smoke failure
 # means nothing was trained, you are almost certainly still at the keyboard,
 # and shutting down would take the error off the screen along with the host.
-sync
 if [[ "${NO_SHUTDOWN:-0}" == "1" ]]; then
   say '[INFO] NO_SHUTDOWN=1, host stays up.\n'
+  shutdown_state="skipped"
+  write_state
   exit "$run_status"
 fi
 
@@ -242,20 +310,66 @@ if (( early_fail )) && [[ "${SHUTDOWN_ON_EARLY_FAIL:-0}" != "1" ]]; then
   say '[FAIL] full transcript: %s\n' "$run_log"
   say '[FAIL] set SHUTDOWN_ON_EARLY_FAIL=1 to power off even in this case.\n'
   say '[FAIL] ==================================================\n'
+  shutdown_state="skipped"
+  write_state
   exit "$run_status"
 fi
 
-say '[INFO] shutting down; run `shutdown -c` within 1 minute to cancel.\n'
-accepted=0
-if command -v shutdown >/dev/null 2>&1; then
-  if shutdown -h +1 || shutdown -h now; then
-    accepted=1
-  fi
+if [[ ! "$shutdown_grace_minutes" =~ ^[0-9]+$ ]]; then
+  say '[FAIL] SHUTDOWN_GRACE_MINUTES must be a non-negative integer; host stays up.\n'
+  shutdown_state="skipped"
+  write_state
+  exit "$run_status"
 fi
-if (( accepted )); then
-  # shutdown is async: if it really worked this sleep never returns.
-  sleep 300
-  say '[WARN] shutdown was accepted but the host is still up after 5 min.\n'
+
+# This host's /usr/bin/shutdown is an AutoDL wrapper that ignores every argument
+# and kills supervisord on the spot, so `shutdown -h +30` powers off NOW and
+# `shutdown -c` does not cancel anything -- it powers the container off too.
+# The grace window therefore has to be a real sleep here, and the cancel has to
+# be something other than `shutdown -c`: Ctrl-C in this pane, or the cancel file
+# (which also works after you detached from tmux).
+cancel_file="output/.cancel_shutdown"
+rm -f "$cancel_file"
+
+say '[INFO] result status=%s; local summary=%s; raw transcript=%s\n' \
+  "$run_status" "$summary_log" "$run_log"
+say '[INFO] powering off in %s minute(s).\n' "$shutdown_grace_minutes"
+say '[INFO] to cancel: Ctrl-C in this pane, or `touch %s/%s`.\n' "$repo_root" "$cancel_file"
+say '[INFO] do NOT run `shutdown -c` here: shutdown ignores its arguments on this\n'
+say '[INFO] host and powers the container off instead of cancelling.\n'
+# Flush the final status, metrics and errors before the countdown starts.
+sync
+
+shutdown_cancelled=0
+trap 'shutdown_cancelled=1' INT TERM
+remaining=$(( shutdown_grace_minutes * 60 ))
+while (( remaining > 0 )); do
+  [[ -f "$cancel_file" ]] && shutdown_cancelled=1
+  (( shutdown_cancelled )) && break
+  if (( remaining % 300 == 0 )) || (( remaining <= 60 )); then
+    say '[INFO] powering off in %s\n' "$(hms "$remaining")"
+  fi
+  chunk=30
+  (( remaining < chunk )) && chunk=$remaining
+  sleep "$chunk"
+  remaining=$(( remaining - chunk ))
+done
+trap - INT TERM
+
+if (( shutdown_cancelled )); then
+  say '\n[INFO] shutdown cancelled; host stays up. Remember it is still billing.\n'
+  rm -f "$cancel_file"
+  shutdown_state="cancelled"
+  write_state
+  exit "$run_status"
+fi
+
+say '[INFO] powering off now at %s\n' "$(now)"
+shutdown_state="poweroff"
+write_state
+if command -v shutdown >/dev/null 2>&1; then
+  shutdown -h now
+  sleep 120
 fi
 if command -v poweroff >/dev/null 2>&1; then
   poweroff

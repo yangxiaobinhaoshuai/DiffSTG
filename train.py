@@ -14,6 +14,33 @@ from utils.common_utils import dir_check, to_device, ws, unfold_dict, dict_merge
 from algorithm.dataset import CleanDataset, TrafficDataset
 from algorithm.diffstg.model import DiffSTG, save2file
 
+def make_trial_name(params):
+    """Short, labelled, still collision-free name for log/checkpoint/forecast files.
+
+    Used to be `'+'.join(every param value)`, which produced ~90-char unlabelled
+    filenames (plus another ~45 from model_file_name()) that were unreadable in
+    `ls`. Keep the knobs worth reading at a glance and fold the *whole* param set
+    into a 6-hex digest, so a sweep over any other parameter still gets its own
+    files. The full parameter set is recorded in output/metrics/DiffSTG.csv.
+
+    gpu and nni are excluded from the digest: they change where a run happens,
+    not what it computes, and must not split one config across two file names.
+    """
+    import hashlib
+    core = (
+        f"{params['data']}_{params['epsilon_theta']}"
+        f"_N{params['N']}_ss{params['sample_steps']}_h{params['hidden_size']}"
+        f"_bs{params['batch_size']}_lr{params['lr']}"
+        f"_se{params['start_epoch']}_e{params['epoch']}_s{params['seed']}"
+    )
+    digest = hashlib.blake2b(
+        repr(sorted((k, v) for k, v in params.items() if k not in ('gpu', 'nni'))).encode(),
+        digest_size=3,
+    ).hexdigest()
+    prefix = 'test_' if params['is_test'] else ''
+    return f"{prefix}{core}_{digest}"
+
+
 def setup_seed(seed):
     import random
     torch.manual_seed(seed)
@@ -316,8 +343,9 @@ def main(params: dict):
         return 0
 
 
-    config.trial_name = '+'.join([f"{v}" for k, v in params.items()])
-    config.log_path = f"{config.PATH_LOG}/{config.trial_name}.log"
+    config.trial_name = make_trial_name(params)
+    # PATH_LOG already ends in '/', so no separator here (it used to yield 'log//').
+    config.log_path = f"{config.PATH_LOG}{config.trial_name}.log"
 
     pprint(config)
     dir_check(config.log_path)
@@ -352,8 +380,12 @@ def main(params: dict):
     # metrics in val, and test dataset, note that we cannot evaluate the performance in the train dataset
     metrics_val = Metric(T_p=config.model.T_h + config.model.T_p)
 
-    model_path = config.PATH_MOD + config.trial_name + model.model_file_name()
+    # trial_name already encodes N/T_h/T_p/epsilon_theta, so model_file_name()
+    # would only repeat them at ~45 extra chars.
+    model_path = config.PATH_MOD + config.trial_name + '.dm4stg'
     config.model_path = model_path
+    # Snapshot of the most recent epoch, kept alongside the best checkpoint.
+    last_model_path = config.PATH_MOD + config.trial_name + '.last.dm4stg'
     config.logger.write(f"model path:{model_path}\n", is_terminal=False)
     print('model_path:', model_path)
     dir_check(model_path)
@@ -433,6 +465,15 @@ def main(params: dict):
             #print('[save model]>> ', model_path)
             torch.save(model, model_path)
 
+        # Always keep a last-epoch snapshot. With --start_epoch 20 no validation
+        # runs before epoch 20, so a crash or a power-off before then would
+        # otherwise leave no checkpoint at all. Written to a temp file and
+        # renamed so an interrupted write cannot corrupt the previous snapshot.
+        # Never loaded for the reported metrics -- the test pass below always
+        # loads the *best* checkpoint.
+        torch.save(model, last_model_path + '.tmp')
+        os.replace(last_model_path + '.tmp', last_model_path)
+
         if epoch - metrics_val.best_metrics['epoch'] > config.early_stop: break  # Early_stop
 
 
@@ -473,7 +514,7 @@ def main(params: dict):
 
     # rename log file
     log_file, log_name = os.path.split(config.log_path)
-    new_log_path = os.path.join(log_file, f"[{config.data.name}]mae{min(metric_lst):7.2f}+{log_name}")
+    new_log_path = os.path.join(log_file, f"{config.trial_name}.mae{min(metric_lst):.2f}.log")
     import shutil
     # os.rename(config.log_path, new_log_path)
     shutil.copy(config.log_path, new_log_path)

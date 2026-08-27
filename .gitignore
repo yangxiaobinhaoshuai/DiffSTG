@@ -27,6 +27,8 @@ dist/
 output/*
 !output/log/
 !output/metrics/
+# why the host went down last time; small, and worth having on every device
+!output/last_run.json
 output/log/*
 !output/log/*.log
 output/log/run_3seeds_*.log
@@ -42,3 +44,11 @@ output_remote/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# sing-box (autodl-proxy) writes its bbolt cache into whatever cwd `proxy_on`
+# was run from; nothing to do with this repo. Fix at the source by setting
+# experimental.cache_file.path in /etc/autodl-proxy/*.json.
+cache.db
+# merge/rebase leftovers
+*.orig
+*.rej
