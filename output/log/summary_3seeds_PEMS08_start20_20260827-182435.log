@@ -1,0 +1,22 @@
+[INFO] dataset=PEMS08 start_epoch=20 gpu=0 max_hours=48
+[INFO] seeds=2022 2023 2024
+[INFO] runner=uv run --frozen --no-sync python
+[INFO] commit=3f47664
+[INFO] raw_log=output/log/run_3seeds_PEMS08_start20_20260827-182435.log
+[INFO] started at 2026-08-27T18:24:35+0800
+
+[INFO] === preflight ===
+[OK] data/dataset/PEMS08/flow.npy
+[OK] data/dataset/PEMS08/adj.npy
+[OK] timeout=/usr/bin/timeout
+[FAIL] python/torch/cuda preflight failed
+
+[FAIL] preflight failed; nothing was trained.
+
+[INFO] === summary ===
+[INFO] finished at 2026-08-27T18:24:36+0800, total elapsed=00:00:01
+[FAIL] seeds never started; preflight or smoke test blocked the run.
+[INFO] last rows of output/metrics/DiffSTG.csv:
+[FAIL] output/metrics/DiffSTG.csv missing
+
+[INFO] === commit results ===
