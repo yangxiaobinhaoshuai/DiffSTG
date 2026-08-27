@@ -212,9 +212,8 @@ def save2file(params):
         # evalution setting
         'n_samples',
         # training set
-        'epoch', 'best_epoch', 'batch_size', 'lr', 'wd', 'early_stop', 'is_test', 'log_time',
+        'epoch', 'best_epoch', 'start_epoch', 'seed', 'batch_size', 'lr', 'wd', 'early_stop', 'is_test', 'log_time',
         # metric result
         'mae', 'rmse', 'mape', 'crps',  'mis', 'time', 'model_path', 'log_path', 'forecast_path',
     ]
     save2file_meta(params,file_name,head)
-

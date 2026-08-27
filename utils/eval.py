@@ -190,6 +190,20 @@ def MIS(
     return numerator
 
 
+def quantile_over_samples(forecast, q, chunk=256):
+    """torch.quantile over dim=1, evaluated in chunks along the batch dim.
+
+    dim=1 is reduced independently per batch element, so chunking is exact. It is
+    needed because torch.quantile rejects inputs above ~16M elements: validation
+    passes n_samples=1 (~7M) but the final test passes n_samples=8 (~57M).
+    """
+    parts = [
+        torch.quantile(forecast[i: i + chunk], q, dim=1)
+        for i in range(0, forecast.shape[0], chunk)
+    ]
+    return torch.cat(parts, dim=0)
+
+
 def calc_mis(target, forecast, alpha = 0.05):
     """
        target: (B, T, V),
@@ -197,8 +211,8 @@ def calc_mis(target, forecast, alpha = 0.05):
     """
     return MIS(
         target = target.cpu().numpy(),
-        lower_quantile = torch.quantile(forecast, alpha / 2, dim=1).cpu().numpy(),
-        upper_quantile = torch.quantile(forecast, 1.0 - alpha / 2, dim=1).cpu().numpy(),
+        lower_quantile = quantile_over_samples(forecast, alpha / 2).cpu().numpy(),
+        upper_quantile = quantile_over_samples(forecast, 1.0 - alpha / 2).cpu().numpy(),
         alpha = alpha,
     )
 

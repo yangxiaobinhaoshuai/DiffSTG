@@ -21,8 +21,17 @@ build/
 dist/
 *.egg-info/
 
-# Project-generated training artifacts
-output/
+# Training artifacts. Metrics and the clean per-run logs are tracked so results
+# reach other devices through git; checkpoints, forecast pickles and the raw
+# runner transcript (one huge \r-laden line) stay on the GPU host.
+output/*
+!output/log/
+!output/metrics/
+output/log/*
+!output/log/*.log
+output/log/run_3seeds_*.log
+output/metrics/*
+!output/metrics/*.csv
 output_remote/
 
 # Machine-local remote-dev config (SSH host, paths) — see scripts/remote_dev.sh

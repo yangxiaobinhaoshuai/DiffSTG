@@ -19,7 +19,7 @@ def setup_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
-    # random.seed(seed)
+    random.seed(seed)
     torch.backends.cudnn.deterministic = True
 
 
@@ -72,6 +72,18 @@ def get_params():
              "best-checkpoint/scheduler/early-stop since Metric.best_metrics['epoch'] "
              "starts at inf",
     )
+    parser.add_argument("--epoch", type=int, default=300, help="Max number of training epochs")
+    parser.add_argument(
+        "--test_batch_size",
+        type=int,
+        default=8,
+        help="Batch size of the final test loader. The sampler expands a batch to "
+             "test_batch_size * n_samples, so peak memory is 8x the validation pass "
+             "at the default batch of 64",
+    )
+    # keep --seed last: config.trial_name joins params in declaration order, so the
+    # seed stays the trailing component of every log/checkpoint/forecast filename
+    parser.add_argument("--seed", type=int, default=2022)
 
     args, _ = parser.parse_known_args()
     return args
@@ -175,7 +187,7 @@ def default_config(data='AIR_BJ', gpu_id=None):
     return config
 
 def evals(model, data_loader, epoch, metric, config, clean_data, mode='Test'):
-    setup_seed(2022)
+    setup_seed(config.seed)
 
     y_pred, y_true, time_lst = [], [], []
     metrics_future = Metric(T_p=config.model.T_p)
@@ -269,8 +281,7 @@ def evals(model, data_loader, epoch, metric, config, clean_data, mode='Test'):
 
 from pprint import  pprint
 def main(params: dict):
-    # torch.manual_seed(2022)
-    setup_seed(2022)
+    setup_seed(params['seed'])
     torch.set_num_threads(2)
     config = default_config(params['data'], params['gpu'])
 
@@ -280,6 +291,9 @@ def main(params: dict):
     config.batch_size = params['batch_size']
     config.mask_ratio = params['mask_ratio']
     config.start_epoch = params['start_epoch']
+    config.seed = params['seed']
+    config.epoch = params['epoch']
+    config.test_batch_size = params['test_batch_size']
 
     # model
     config.model.N = params['N']
@@ -328,7 +342,7 @@ def main(params: dict):
     val_loader = torch.utils.data.DataLoader(val_dataset, 64, shuffle=False)
 
     test_dataset = TrafficDataset(clean_data, (config.data.test_start_idx + config.model.T_p, -1), config)
-    test_loader = torch.utils.data.DataLoader(test_dataset, 64, shuffle=False)
+    test_loader = torch.utils.data.DataLoader(test_dataset, config.test_batch_size, shuffle=False)
 
 
     # Create optimizer
@@ -422,12 +436,14 @@ def main(params: dict):
         if epoch - metrics_val.best_metrics['epoch'] > config.early_stop: break  # Early_stop
 
 
+    # weights_only=False is required: model_path holds a pickled nn.Module, and torch>=2.6
+    # defaults to weights_only=True. Do not swallow the error -- falling through would
+    # silently report test metrics of the last-epoch model instead of the best one.
     try:
-        model = torch.load(model_path, map_location=config.device)
+        model = torch.load(model_path, map_location=config.device, weights_only=False)
         print('best model loaded from: <<', model_path)
     except Exception as err:
-        print(err)
-        print('load best model failed')
+        raise RuntimeError(f"failed to load best checkpoint: {model_path}") from err
 
     # conduct multiple-samples, then report the best
     metric_lst = []
@@ -452,6 +468,9 @@ def main(params: dict):
         save2file(params)
         metric_lst.append(metrics_test.metrics['mae'])
 
+    if not metric_lst:
+        raise RuntimeError('no test evaluation ran; check sample_steps against model.N')
+
     # rename log file
     log_file, log_name = os.path.split(config.log_path)
     new_log_path = os.path.join(log_file, f"[{config.data.name}]mae{min(metric_lst):7.2f}+{log_name}")
@@ -465,7 +484,11 @@ def main(params: dict):
     except:
         pass
 
-    nni.report_final_result(min(metric_lst))
+    # results are already on disk at this point; never fail the run over the nni report
+    try:
+        nni.report_final_result(min(metric_lst))
+    except Exception as err:
+        print('nni.report_final_result skipped:', err)
 
 
 # data.name	model	model.N	model.epsilon_theta	model.d_h	model.T_h	model.T_p	model.sample_strategy
