@@ -1,0 +1,33 @@
+scripts/run_3seeds_shutdown.sh
+  s_91aba3cd211ff9::t_022ede893ce817 181-190,194-195,246
+  s_91aba3cd211ff9::t_ee65b9c04ad635 238
+  s_91aba3cd211ff9::t_8b02ed37e3c9ad 196
+  s_91aba3cd211ff9::t_fcda3d58290fc7 239-241,243-245
+  s_91aba3cd211ff9::t_7b1c25f13690ca 247
+  s_91aba3cd211ff9::t_32f05e70defa18 14-16,95-100,229-231,242
+reproduction_note.md
+  s_91aba3cd211ff9::t_65338ce21c6162 205-207
+  s_91aba3cd211ff9::t_1ee7529935e9a5 95-102
+  s_91aba3cd211ff9::t_153de4b0705266 94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "355088c8927c8d473d294630c9baa4f0f376e22c",
+  "prompts": {},
+  "humans": {
+    "h_c17f9147a0a04a": {
+      "author": "yangxiaobin01 <yangxiaobin01@zuoyebang.com>"
+    }
+  },
+  "sessions": {
+    "s_91aba3cd211ff9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "aa93dcee-498c-463d-8dc8-f9a552bc8ffb",
+        "model": "claude-opus-5"
+      },
+      "human_author": "yangxiaobin01 <yangxiaobin01@zuoyebang.com>"
+    }
+  }
+}
