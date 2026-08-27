@@ -1,0 +1,35 @@
+scripts/remote_dev.sh
+  s_bb9cdcb31e8a62::t_5422b8ae0fc072 7,21-23,33,46-48,60-61,64-67,72-79,91,103-106,143-144,164,179-180,187,196-197,200-201
+  s_bb9cdcb31e8a62::t_aa45bd99d9fa24 115-137
+  s_bb9cdcb31e8a62::t_77b1ee9af5d54b 68-71
+reproduction_note.md
+  s_bb9cdcb31e8a62::t_aa45bd99d9fa24 28
+  s_bb9cdcb31e8a62::t_8aa951da8987d4 30-37,39-44
+  s_bb9cdcb31e8a62::t_77b1ee9af5d54b 25,38
+  s_bb9cdcb31e8a62::t_5422b8ae0fc072 12-16,19,22-24,45
+  s_bb9cdcb31e8a62::t_88f0d77e7fa548 29
+AGENTS.md
+  s_bb9cdcb31e8a62::t_77b1ee9af5d54b 19
+  s_bb9cdcb31e8a62::t_5422b8ae0fc072 22-26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "c0fe9a48df4549cd7a629cf967a42566ffa1348f",
+  "prompts": {},
+  "humans": {
+    "h_c17f9147a0a04a": {
+      "author": "yangxiaobin01 <yangxiaobin01@zuoyebang.com>"
+    }
+  },
+  "sessions": {
+    "s_bb9cdcb31e8a62": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0422e-3cc4-7381-80d0-7fb71724ce1a",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "yangxiaobin01 <yangxiaobin01@zuoyebang.com>"
+    }
+  }
+}
