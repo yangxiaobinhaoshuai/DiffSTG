@@ -9,22 +9,40 @@
 使用 `scripts/remote_dev.sh` 做本机开发、远端 GPU 执行：
 
 ```bash
-REMOTE_HOST=gpu REMOTE_DIR='~/runs/DiffSTG' scripts/remote_dev.sh push
-REMOTE_HOST=gpu REMOTE_DIR='~/runs/DiffSTG' scripts/remote_dev.sh py train.py --data PEMS08
-REMOTE_HOST=gpu REMOTE_DIR='~/runs/DiffSTG' scripts/remote_dev.sh exec nvidia-smi
-REMOTE_HOST=gpu REMOTE_DIR='~/runs/DiffSTG' scripts/remote_dev.sh tail
-REMOTE_HOST=gpu REMOTE_DIR='~/runs/DiffSTG' scripts/remote_dev.sh pull-output
+scripts/remote_dev.sh push
+scripts/remote_dev.sh py train.py --data PEMS08
+scripts/remote_dev.sh exec nvidia-smi
+scripts/remote_dev.sh tail
+scripts/remote_dev.sh pull-output
 ```
 
-可把配置写进 `.remote-dev.env`：
+先填写本机 `.remote-dev.env`：
 
 ```bash
-REMOTE_HOST=gpu
-REMOTE_DIR=~/runs/DiffSTG
-PY_RUNNER=uv run python
+REMOTE_HOSTNAME=<hostname-or-ip>
+REMOTE_PORT=<port>
+REMOTE_USER=<user>
+REMOTE_DIR=<remote-repo-dir>
 ```
 
-注意：`push` 使用 `rsync --delete` 同步代码，但默认排除 `data/dataset/` 和 `output/`；数据和训练结果应保留在远端，结果用 `pull-output` 拉回本机分析。简单换入口用 `py`，复杂实验组合写成 repo 内脚本后用 `job <script>`。
+注意：脚本用以上三项显式生成 SSH 命令，不读取 `~/.ssh/config`。`push` 使用 `rsync --delete`，但默认排除 `data/dataset/` 和 `output/`；数据和训练结果保留在远端，用 `pull-output` 拉回本机。代码逻辑改动：远端连接由 SSH alias 改为 hostname、port、user 三项直连；`push` 结束时输出 `[OK]` 或 `[FAIL]`。
+
+# AutoDL Proxy
+
+```bash
+# 代码 push 到远端后，在 GPU host 执行
+cd ~/runs/DiffSTG
+bash autodl-proxy.sh setup          # 按提示输入 client.json 的 HTTPS URL
+source /root/.bashrc
+
+proxy_on auto                       # 开启；auto 会按环境自动降级
+proxy_off                           # 关闭
+proxy_status                        # 查看状态
+proxy_test                          # 测试连通性
+proxy_refresh                       # 手动刷新订阅
+```
+
+> **Tips:** 若 `sing-box` 下载失败，可在本机从官方 Release 下载对应架构的 `.deb`，执行 `source .remote-dev.env && scp -F /dev/null -P "$REMOTE_PORT" <sing-box.deb> "$REMOTE_USER@$REMOTE_HOSTNAME:/tmp/sing-box.deb"`，再到 host 运行 `dpkg -i /tmp/sing-box.deb`，最后重试 `bash autodl-proxy.sh setup`。
 
 # 与原文的差异
 

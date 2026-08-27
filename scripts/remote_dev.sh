@@ -4,7 +4,7 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  REMOTE_HOST=gpu REMOTE_DIR='~/runs/Repo' scripts/remote_dev.sh <command> [args...]
+  scripts/remote_dev.sh <command> [args...]
 
 Commands:
   push                 Sync local source to remote, excluding data/output/cache files.
@@ -18,7 +18,9 @@ Commands:
   status               Print resolved local/remote paths.
 
 Config:
-  REMOTE_HOST          SSH host or alias. Required.
+  REMOTE_HOSTNAME      Remote SSH hostname or IP. Required.
+  REMOTE_PORT          Remote SSH port. Required.
+  REMOTE_USER          Remote SSH user. Required.
   REMOTE_DIR           Remote repo directory. Default: ~/runs/<local repo name>.
   LOCAL_DIR            Local repo directory. Default: current working directory.
   OUTPUT_DIR           Remote output directory inside repo. Default: output.
@@ -28,6 +30,7 @@ Config:
 
 Optional:
   Put the variables above in .remote-dev.env; this script will source it.
+  SSH commands use -F /dev/null and do not read ~/.ssh/config.
   Keep REMOTE_DIR free of spaces; shell-style ~/... paths are supported.
 EOF
 }
@@ -40,7 +43,9 @@ fi
 
 LOCAL_DIR="${LOCAL_DIR:-$root_dir}"
 repo_name="$(basename "$LOCAL_DIR")"
-REMOTE_HOST="${REMOTE_HOST:-}"
+REMOTE_HOSTNAME="${REMOTE_HOSTNAME:-}"
+REMOTE_PORT="${REMOTE_PORT:-}"
+REMOTE_USER="${REMOTE_USER:-}"
 REMOTE_DIR="${REMOTE_DIR:-~/runs/$repo_name}"
 OUTPUT_DIR="${OUTPUT_DIR:-output}"
 LOCAL_OUTPUT_DIR="${LOCAL_OUTPUT_DIR:-output_remote}"
@@ -52,10 +57,26 @@ if [[ "$REMOTE_DIR" == "$HOME/"* ]]; then
 fi
 
 require_remote() {
-  if [[ -z "$REMOTE_HOST" ]]; then
-    echo "REMOTE_HOST is required. Example: REMOTE_HOST=gpu REMOTE_DIR='~/runs/$repo_name' $0 status" >&2
+  if [[ -z "$REMOTE_HOSTNAME" || -z "$REMOTE_PORT" || -z "$REMOTE_USER" ]]; then
+    echo "REMOTE_HOSTNAME, REMOTE_PORT and REMOTE_USER are required in .remote-dev.env." >&2
     exit 2
   fi
+  if [[ ! "$REMOTE_PORT" =~ ^[0-9]+$ ]]; then
+    echo "REMOTE_PORT must be numeric." >&2
+    exit 2
+  fi
+  if (( 10#$REMOTE_PORT < 1 || 10#$REMOTE_PORT > 65535 )); then
+    echo "REMOTE_PORT must be between 1 and 65535." >&2
+    exit 2
+  fi
+}
+
+remote_target() {
+  printf '%s@%s' "$REMOTE_USER" "$REMOTE_HOSTNAME"
+}
+
+ssh_remote() {
+  ssh -F /dev/null -p "$REMOTE_PORT" "$(remote_target)" "$@"
 }
 
 remote_cd() {
@@ -67,7 +88,7 @@ quote_args() {
 }
 
 run_remote() {
-  ssh "$REMOTE_HOST" "$(remote_cd) && $(quote_args "$@")"
+  ssh_remote "$(remote_cd) && $(quote_args "$@")"
 }
 
 cmd="${1:-}"
@@ -79,7 +100,10 @@ case "$cmd" in
   status)
     require_remote
     printf 'LOCAL_DIR=%s\n' "$LOCAL_DIR"
-    printf 'REMOTE_HOST=%s\n' "$REMOTE_HOST"
+    printf 'REMOTE_HOSTNAME=%s\n' "$REMOTE_HOSTNAME"
+    printf 'REMOTE_PORT=%s\n' "$REMOTE_PORT"
+    printf 'REMOTE_USER=%s\n' "$REMOTE_USER"
+    printf 'SSH_COMMAND=ssh -F /dev/null -p %s %s\n' "$REMOTE_PORT" "$(remote_target)"
     printf 'REMOTE_DIR=%s\n' "$REMOTE_DIR"
     printf 'OUTPUT_DIR=%s\n' "$OUTPUT_DIR"
     printf 'LOCAL_OUTPUT_DIR=%s\n' "$LOCAL_OUTPUT_DIR"
@@ -88,29 +112,36 @@ case "$cmd" in
 
   push)
     require_remote
-    ssh "$REMOTE_HOST" "mkdir -p $REMOTE_DIR"
-    # Intentionally keep generated artifacts and datasets remote-owned.
-    # shellcheck disable=SC2086
-    rsync -az --delete \
-      --exclude '.git/' \
-      --exclude '.venv/' \
-      --exclude 'venv/' \
-      --exclude '__pycache__/' \
-      --exclude '.pytest_cache/' \
-      --exclude '.mypy_cache/' \
-      --exclude '.ruff_cache/' \
-      --exclude '.remote-dev.env' \
-      --exclude "$OUTPUT_DIR/" \
-      --exclude "$LOCAL_OUTPUT_DIR/" \
-      --exclude 'data/dataset/' \
-      $RSYNC_EXCLUDES \
-      "$LOCAL_DIR/" "$REMOTE_HOST:$REMOTE_DIR/"
+    if ssh_remote "mkdir -p $REMOTE_DIR" && \
+      rsync -az --delete -e "ssh -F /dev/null -p $REMOTE_PORT" \
+        --exclude '.git/' \
+        --exclude '.venv/' \
+        --exclude 'venv/' \
+        --exclude '__pycache__/' \
+        --exclude '.pytest_cache/' \
+        --exclude '.mypy_cache/' \
+        --exclude '.ruff_cache/' \
+        --exclude '.remote-dev.env' \
+        --exclude "$OUTPUT_DIR/" \
+        --exclude "$LOCAL_OUTPUT_DIR/" \
+        --exclude 'data/dataset/' \
+        $RSYNC_EXCLUDES \
+        "$LOCAL_DIR/" "$(remote_target):$REMOTE_DIR/"; then
+      printf '[OK] push complete: %s -> %s:%s/\n' \
+        "$LOCAL_DIR" "$(remote_target)" "$REMOTE_DIR"
+    else
+      push_status=$?
+      printf '[FAIL] push failed (exit %s): %s -> %s:%s/\n' \
+        "$push_status" "$LOCAL_DIR" "$(remote_target)" "$REMOTE_DIR" >&2
+      exit "$push_status"
+    fi
     ;;
 
   pull-output)
     require_remote
     mkdir -p "$LOCAL_DIR/$LOCAL_OUTPUT_DIR"
-    rsync -az "$REMOTE_HOST:$REMOTE_DIR/$OUTPUT_DIR/" "$LOCAL_DIR/$LOCAL_OUTPUT_DIR/"
+    rsync -az -e "ssh -F /dev/null -p $REMOTE_PORT" \
+      "$(remote_target):$REMOTE_DIR/$OUTPUT_DIR/" "$LOCAL_DIR/$LOCAL_OUTPUT_DIR/"
     ;;
 
   exec)
@@ -130,7 +161,7 @@ case "$cmd" in
       echo "py requires an entry file. Example: $0 py train.py --data PEMS08" >&2
       exit 2
     fi
-    ssh "$REMOTE_HOST" "$(remote_cd) && $PY_RUNNER $(quote_args "$@")"
+    ssh_remote "$(remote_cd) && $PY_RUNNER $(quote_args "$@")"
     ;;
 
   job)
@@ -145,14 +176,15 @@ case "$cmd" in
 
   ssh)
     require_remote
-    ssh -t "$REMOTE_HOST" "$(remote_cd) && exec \"\$SHELL\" -l"
+    ssh -F /dev/null -p "$REMOTE_PORT" -t "$(remote_target)" \
+      "$(remote_cd) && exec \"\$SHELL\" -l"
     ;;
 
   tail)
     require_remote
     shift
     pattern="${1:-$OUTPUT_DIR/log/*.log}"
-    ssh "$REMOTE_HOST" "$(remote_cd) && tail -F $pattern"
+    ssh_remote "$(remote_cd) && tail -F $pattern"
     ;;
 
   tmux)
@@ -161,10 +193,12 @@ case "$cmd" in
     session="${1:-remote-dev}"
     shift || true
     if [[ "$#" -eq 0 ]]; then
-      ssh -t "$REMOTE_HOST" "$(remote_cd) && tmux new -A -s $(printf '%q' "$session")"
+      ssh -F /dev/null -p "$REMOTE_PORT" -t "$(remote_target)" \
+        "$(remote_cd) && tmux new -A -s $(printf '%q' "$session")"
     else
       inner_cmd="$(quote_args "$@")"
-      ssh -t "$REMOTE_HOST" "$(remote_cd) && tmux new -A -s $(printf '%q' "$session") $(printf '%q' "$inner_cmd")"
+      ssh -F /dev/null -p "$REMOTE_PORT" -t "$(remote_target)" \
+        "$(remote_cd) && tmux new -A -s $(printf '%q' "$session") $(printf '%q' "$inner_cmd")"
     fi
     ;;
 

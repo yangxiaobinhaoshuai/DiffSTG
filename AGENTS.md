@@ -16,13 +16,13 @@
 
 ## Remote Dev
 
-使用 `scripts/remote_dev.sh` 作为本机到 GPU host 的 facade。约定本机是唯一代码源，远端只负责运行；`push` 会排除 `.git/`、虚拟环境、`data/dataset/`、`output/`，避免覆盖远端数据和训练结果。
+使用 `scripts/remote_dev.sh` 作为本机到 GPU host 的 facade，连接参数从 `.remote-dev.env` 读取。约定本机是唯一代码源，远端只负责运行；`push` 会排除 `.git/`、虚拟环境、`data/dataset/`、`output/`，避免覆盖远端数据和训练结果。
 
 常用命令：
-- `REMOTE_HOST=gpu REMOTE_DIR='~/runs/DiffSTG' scripts/remote_dev.sh push`
-- `REMOTE_HOST=gpu REMOTE_DIR='~/runs/DiffSTG' scripts/remote_dev.sh py train.py --data PEMS08`
-- `REMOTE_HOST=gpu REMOTE_DIR='~/runs/DiffSTG' scripts/remote_dev.sh exec nvidia-smi`
-- `REMOTE_HOST=gpu REMOTE_DIR='~/runs/DiffSTG' scripts/remote_dev.sh tail`
-- `REMOTE_HOST=gpu REMOTE_DIR='~/runs/DiffSTG' scripts/remote_dev.sh pull-output`
+- `scripts/remote_dev.sh push`
+- `scripts/remote_dev.sh py train.py --data PEMS08`
+- `scripts/remote_dev.sh exec nvidia-smi`
+- `scripts/remote_dev.sh tail`
+- `scripts/remote_dev.sh pull-output`
 
 复杂实验组合写成 repo 内脚本后，用 `scripts/remote_dev.sh job <script>` 在远端执行。
