@@ -1,0 +1,16 @@
+output/log/summary_3seeds_PEMS08_start20_20260827-183133.log
+  h_c17f9147a0a04a 1-36
+output/metrics/DiffSTG.csv
+  h_c17f9147a0a04a 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "4ecd50bd9f1277a476725503d24f0ad5f9b4ed8b",
+  "prompts": {},
+  "humans": {
+    "h_c17f9147a0a04a": {
+      "author": "yangxiaobin01 <yangxiaobin01@zuoyebang.com>"
+    }
+  }
+}
