@@ -11,6 +11,9 @@
 #   SKIP_SMOKE=0            1 skips the --is_test end-to-end check
 #   COMMIT_RESULTS=1        0 skips the host-local git commit of output/
 #   NO_SHUTDOWN=0           1 keeps the host up after the run
+#   SHUTDOWN_ON_EARLY_FAIL=0  1 powers off even when nothing usable came out
+#                             (preflight/smoke failed, or every seed failed within
+#                             an hour). Default keeps the host up to stay debuggable.
 set -uo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" || exit 1
@@ -89,6 +92,12 @@ print(f"[OK] torch={torch.__version__} cuda={torch.cuda.is_available()} "
 sys.exit(0 if torch.cuda.is_available() else 1)
 '; then
   say '[FAIL] python/torch/cuda preflight failed\n'
+  if [[ ! -d .venv ]]; then
+    say '[HINT] no .venv in %s; on a fresh host run `uv sync` first\n' "$repo_root"
+  else
+    say '[HINT] if CUDA is unavailable the instance is probably booted in no-GPU mode;\n'
+    say '[HINT] power it off and start it again with a GPU attached.\n'
+  fi
   preflight_ok=0
 fi
 
@@ -169,10 +178,22 @@ tail -n $(( ${#seeds[@]} + 1 )) "$csv" 2>/dev/null | tee -a "$summary_log" \
   || say '[FAIL] %s missing\n' "$csv"
 ls -lh output/model output/forecast 2>/dev/null || true
 
+# "early failure" = nothing usable came out AND it happened fast enough that you
+# are probably still watching. Drives both the commit and the shutdown decision:
+# no commit noise, and the host stays up so the error remains readable.
+early_fail=0
+if (( ! seeds_ran )); then
+  early_fail=1
+elif (( ${#failed[@]} == ${#seeds[@]} )) && (( SECONDS < 3600 )); then
+  early_fail=1
+fi
+
 # ---- commit results on the host (push is manual) ---------------------------
 # Only output/metrics/*.csv and the tracked logs are staged; .gitignore keeps
 # checkpoints, forecast pickles and the raw transcript out.
-if [[ "${COMMIT_RESULTS:-1}" != "1" ]]; then
+if (( early_fail )); then
+  say '\n[INFO] no usable result; nothing committed.\n'
+elif [[ "${COMMIT_RESULTS:-1}" != "1" ]]; then
   say '\n[INFO] COMMIT_RESULTS=0, results left uncommitted under output/.\n'
 elif ! git rev-parse --git-dir >/dev/null 2>&1; then
   say '\n[WARN] not a git repo; results left uncommitted under output/.\n'
@@ -205,9 +226,22 @@ fi
 say '[INFO] checkpoints and forecast pickles stay on this host (gitignored).\n'
 
 # ---- shutdown --------------------------------------------------------------
+# Only power off once the real seeds have started. A preflight/smoke failure
+# means nothing was trained, you are almost certainly still at the keyboard,
+# and shutting down would take the error off the screen along with the host.
 sync
 if [[ "${NO_SHUTDOWN:-0}" == "1" ]]; then
   say '[INFO] NO_SHUTDOWN=1, host stays up.\n'
+  exit "$run_status"
+fi
+
+# A long run always powers off, even a failed one; see early_fail above.
+if (( early_fail )) && [[ "${SHUTDOWN_ON_EARLY_FAIL:-0}" != "1" ]]; then
+  say '\n[FAIL] ==================================================\n'
+  say '[FAIL] no usable result -- host stays up so you can read the error above.\n'
+  say '[FAIL] full transcript: %s\n' "$run_log"
+  say '[FAIL] set SHUTDOWN_ON_EARLY_FAIL=1 to power off even in this case.\n'
+  say '[FAIL] ==================================================\n'
   exit "$run_status"
 fi
 

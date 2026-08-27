@@ -91,7 +91,15 @@ bash scripts/run_3seeds_shutdown.sh
 
 环境变量：`DATASET=PEMS08` `START_EPOCH=20` `GPU=0` `SEEDS="2022 2023 2024"`
 `MAX_HOURS=48`（单 seed 墙钟上限，0 关闭）`SKIP_SMOKE=1`（跳过冒烟）
-`COMMIT_RESULTS=0`（不自动 commit 结果）`NO_SHUTDOWN=1`（跑完不关机）。
+`COMMIT_RESULTS=0`（不自动 commit 结果）`NO_SHUTDOWN=1`（跑完不关机）
+`SHUTDOWN_ON_EARLY_FAIL=1`（没跑出结果时也关机，默认不关）。
+
+**关机策略**：满足以下任一条件时**保持开机、也不 commit**，好让你直接看到报错——
+
+- preflight 或冒烟失败（什么都没训练）
+- 三个 seed 全失败且总耗时不到 1 小时（系统性问题，不是跑到一半崩的）
+
+其余情况一律关机：那才是无人值守的长跑，不关就空烧 GPU。
 
 ## 随时查看状态
 
@@ -194,6 +202,9 @@ git pull
 - **关机前 commit**：机器一关就拉不到文件了，所以指标和日志在关机前先落成一个 commit；
   只 `git add` `output/metrics` 和 `output/log`，大文件靠 `.gitignore` 挡住。
   不自动 push：关机时机器未必有网，且推送是对外动作。
+- **没结果就不关机**：关机是为了长跑结束后不空烧 GPU，但"什么都没跑出来"时关机只会把
+  报错连同机器一起带走，只能重新开机翻日志。所以 preflight/冒烟失败、或三个 seed 在
+  1 小时内全挂，都保持开机且不 commit。
 - **关机可验证**：`shutdown -h +1` 留一分钟 `shutdown -c` 的窗口；`shutdown` 是异步返回的，
   所以额外 sleep 5 分钟确认真的关掉了，没关掉才退回 `poweroff`。
 
