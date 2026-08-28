@@ -113,6 +113,11 @@ val MAE 带一个 ≤0.2 的固定偏移，**不能与全量验证的历史日�
 - 更正一条此前记录过头的说法：`model.train()` 那个修复在**本配置下数值上是 no-op**。UGnet
   里只有 `nn.Dropout` 且 `dropout=0.0`，没有 BatchNorm，train/eval 模式对前向没有影响。
   修复仍然保留（改 `dropout > 0` 时才是对的），但不应把它算作与原文的行为差异。
+- 日志的 epoch 列改为**整数 epoch index**。原来打的是 `i / len(train_loader) + epoch`，
+  每个 epoch 最后一个 batch 的值是 `epoch + 0.999`，格式化后**进位成下一个 epoch**（code
+  epoch 135 记成 `136.0`），和 metrics CSV 里的 `best_epoch` 对不上。现在日志里的数就是
+  `best_epoch` 里的数；batch 进度 `[i/N]` 只留在终端，不进日志。**2026-08-29 之前的日志仍是
+  旧格式，比较时要减 1。**
 - 新增 `--start_epoch`（默认 0，不改变原行为）：跳过最前面几个 epoch 的验证。之所以安全，是因为 `Metric.best_metrics['epoch']` 初始值是 `np.inf`，跳过期间不会误存 checkpoint、不会误触发 early stop，scheduler 的 patience 计数也只从真正开始验证的 epoch 起算。这个跳过仅限"训练最前面几个 epoch"，中途/全程降低验证频率仍适用上一节的结论（不能视为等价）。
 - 修复了一个原仓库自带的 bug：`evals()` 里会调用 `model.eval()`，但训练循环从未调用 `model.train()`，导致第一次验证之后所有训练 batch 实际上都在 eval 模式下跑（UGnet 里的 `nn.Dropout` 一直失效）。现已在每个 epoch 的训练 batch 循环前显式加上 `model.train()`。
 - `--start_epoch > 0` 的副作用（需记录在案）：`evals()` 开头的 `setup_seed()` 会重置全局 CPU RNG，而 `train_loader` 每个 epoch 建迭代器时从该 RNG 取 shuffle 种子，所以原实现里从 epoch 1 起每个 epoch 的 batch 顺序都是同一个。跳过前若干 epoch 的验证 = 跳过这次重置，被跳过的 epoch 反而是正常 shuffle。因此 `--start_epoch 20` 不只是省时间，也轻微改变了训练轨迹，不能声称与原文逐 step 等价。

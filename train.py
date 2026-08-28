@@ -468,9 +468,17 @@ def main(params: dict):
             avg_loss = avg_loss * (n - 1) / n + loss.item() / n
 
             time_lst.append((timer() - time_start))
-            message = f"{i / len(train_loader) + epoch:6.1f}| {avg_loss:0.3f} {np.sum(time_lst):.1f}s"
-            print('\r' + message, end='', flush=True)
+            # The epoch index, not the old `i / len(train_loader) + epoch` progress
+            # counter: its last value per epoch was epoch + 0.999, which printed as
+            # the *next* epoch (code epoch 135 was logged as "136.0") and never
+            # lined up with best_epoch in the metrics CSV. Batch progress stays on
+            # the terminal only, so the logged line is one integer epoch.
+            message = f"{epoch:6d}| {avg_loss:0.3f} {np.sum(time_lst):.1f}s"
+            print(f'\r{message} [{i + 1}/{len(train_loader)}]\033[K', end='', flush=True)
 
+        # \033[K erases the batch counter, so evals() below appends its columns
+        # right after the training part instead of after a stale "[1339/1339]".
+        print(f'\r{message}\033[K', end='', flush=True)
         config.logger.message_buffer += message
 
         try:
