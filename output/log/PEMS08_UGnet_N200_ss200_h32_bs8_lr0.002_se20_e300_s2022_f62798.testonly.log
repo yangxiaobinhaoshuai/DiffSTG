@@ -1,0 +1,3 @@
+predict_path = '/root/projects/DiffSTG/output/forecast/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se20_e300_s2022_f62798.testonly.pkl'
+ |[26.74  37.10  ] | 0.21   0.28   1003.13s
+Final results in test:26.74  37.10  18.21  0.09    441.37  | 136  

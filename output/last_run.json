@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "status": "aborted",
+  "shutdown": "cancelled",
+  "exit_status": null,
+  "run_tag": "PEMS08_start20_20260828-015307",
+  "dataset": "PEMS08",
+  "start_epoch": 20,
+  "seeds": [
+    "2022",
+    "2023",
+    "2024"
+  ],
+  "failed_seeds": [],
+  "started": "2026-08-28T01:53:07+0800",
+  "finished": "2026-08-29T02:24:00+0800",
+  "code_commit": "978714d",
+  "results_commit": null,
+  "summary_log": "/root/projects/DiffSTG/output/log/summary_3seeds_PEMS08_start20_20260828-015307.log",
+  "raw_log": "/root/projects/DiffSTG/output/log/run_3seeds_PEMS08_start20_20260828-015307.log",
+  "checkpoints": [
+    "output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se20_e300_s2022_f62798.dm4stg",
+    "output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se20_e300_s2022_f62798.last.dm4stg"
+  ],
+  "val_subset": 0,
+  "epochs_trained": 136,
+  "best_epoch": 135,
+  "note": "operator abort: at 12.2 min/epoch the full-split validation made a 300-epoch seed take ~61 h, over the 48 h per-seed cap, so no seed could ever reach the test phase. Restarted with --val_subset 512."
+}

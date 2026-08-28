@@ -202,9 +202,10 @@ def generalized_steps(x, seq, model, b, c, **kwargs):
 
 # ---Log--
 from utils.common_utils import save2file_meta, ws
-def save2file(params):
-    file_name = ws + f'/output/metrics/DiffSTG.csv'
-    head = [
+# Module-level so a caller can verify it can fill every column before spending
+# hours on a run: save2file_meta indexes params[k], so a missing knob is a
+# KeyError at the very last step.
+CSV_HEAD = [
         # data setting
         'data.name',
         # mdoel parameters
@@ -212,8 +213,12 @@ def save2file(params):
         # evalution setting
         'n_samples',
         # training set
-        'epoch', 'best_epoch', 'start_epoch', 'seed', 'batch_size', 'lr', 'wd', 'early_stop', 'is_test', 'log_time',
+        'epoch', 'best_epoch', 'start_epoch', 'val_subset', 'seed', 'batch_size', 'lr', 'wd', 'early_stop', 'is_test', 'log_time',
         # metric result
         'mae', 'rmse', 'mape', 'crps',  'mis', 'time', 'model_path', 'log_path', 'forecast_path',
-    ]
-    save2file_meta(params,file_name,head)
+]
+
+
+def save2file(params):
+    file_name = ws + f'/output/metrics/DiffSTG.csv'
+    save2file_meta(params, file_name, CSV_HEAD)

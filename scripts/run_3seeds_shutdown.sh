@@ -4,7 +4,8 @@
 #
 # Env knobs:
 #   DATASET=PEMS08          dataset name
-#   START_EPOCH=20          skip validation before this epoch
+#   START_EPOCH=0           skip validation before this epoch (0 = original behaviour)
+#   VAL_SUBSET=512          per-epoch validation windows, evenly spaced (0 = full split)
 #   GPU=0                   cuda device index
 #   SEEDS="2022 2023 2024"  seeds to run, in order
 #   MAX_HOURS=48            per-seed wall clock limit; 0 disables
@@ -21,7 +22,8 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" || exit 1
 cd "$repo_root" || exit 1
 
 dataset="${DATASET:-PEMS08}"
-start_epoch="${START_EPOCH:-20}"
+start_epoch="${START_EPOCH:-0}"
+val_subset="${VAL_SUBSET:-512}"
 gpu="${GPU:-0}"
 max_hours="${MAX_HOURS:-48}"
 shutdown_grace_minutes="${SHUTDOWN_GRACE_MINUTES:-30}"
@@ -53,6 +55,9 @@ say() { printf "$@" | tee -a "$summary_log"; }
 # both the raw transcript and the committed summary log lost their tails around
 # the power-off, so a single end-of-run write is not something to rely on.
 # run_state:      running | preflight_failed | smoke_failed | seed_failed | success
+#                 ('aborted' is never written by this script -- it is set by hand
+#                  when an operator stops a run on purpose, so that a leftover
+#                  'running' keeps meaning 'killed by something we did not choose')
 # shutdown_state: pending | skipped | cancelled | poweroff
 run_state="running"
 shutdown_state="pending"
@@ -84,6 +89,7 @@ write_state() {
     printf '  "run_tag": %s,\n' "$(json_str "$run_tag")"
     printf '  "dataset": %s,\n' "$(json_str "$dataset")"
     printf '  "start_epoch": %s,\n' "$start_epoch"
+    printf '  "val_subset": %s,\n' "$val_subset"
     printf '  "seeds": %s,\n' "$(json_arr "${seeds[@]}")"
     printf '  "failed_seeds": %s,\n' "$(json_arr ${failed[@]+"${failed[@]}"})"
     printf '  "started": %s,\n' "$(json_str "$started_at")"
@@ -111,8 +117,8 @@ run_with_timeout() {
   fi
 }
 
-say '[INFO] dataset=%s start_epoch=%s gpu=%s max_hours=%s\n' \
-  "$dataset" "$start_epoch" "$gpu" "$max_hours"
+say '[INFO] dataset=%s start_epoch=%s val_subset=%s gpu=%s max_hours=%s\n' \
+  "$dataset" "$start_epoch" "$val_subset" "$gpu" "$max_hours"
 say '[INFO] seeds=%s\n' "${seeds[*]}"
 say '[INFO] runner=%s\n' "${py_runner[*]}"
 say '[INFO] commit=%s\n' "$(git rev-parse --short HEAD 2>/dev/null || echo 'not a git repo')"
@@ -176,7 +182,7 @@ else
     say '\n[INFO] === smoke test (--is_test) ===\n'
     if run_with_timeout 1 "${py_runner[@]}" train.py \
       --data "$dataset" --gpu "$gpu" \
-      --is_test --start_epoch 0 --epoch 2 --seed "${seeds[0]}"; then
+      --is_test --start_epoch 0 --epoch 2 --val_subset "$val_subset" --seed "${seeds[0]}"; then
       say '[OK] smoke test passed at %s\n' "$(now)"
     else
       say '[FAIL] smoke test failed (status %s); skipping the real run.\n' "$?"
@@ -200,6 +206,7 @@ if (( run_status == 0 )); then
       --data "$dataset" \
       --gpu "$gpu" \
       --start_epoch "$start_epoch" \
+      --val_subset "$val_subset" \
       --seed "$seed"
     seed_status=$?
 

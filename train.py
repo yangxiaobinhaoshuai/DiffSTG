@@ -108,6 +108,15 @@ def get_params():
              "test_batch_size * n_samples, so peak memory is 8x the validation pass "
              "at the default batch of 64",
     )
+    parser.add_argument(
+        "--val_subset",
+        type=int,
+        default=512,
+        help="Score per-epoch validation on this many evenly spaced windows "
+             "instead of the full split (0 = full split). Validation still runs "
+             "every epoch, so scheduler patience, early stopping and the per-epoch "
+             "setup_seed() reset keep their original meaning",
+    )
     # keep --seed last: config.trial_name joins params in declaration order, so the
     # seed stays the trailing component of every log/checkpoint/forecast filename
     parser.add_argument("--seed", type=int, default=2022)
@@ -321,6 +330,7 @@ def main(params: dict):
     config.seed = params['seed']
     config.epoch = params['epoch']
     config.test_batch_size = params['test_batch_size']
+    config.val_subset = params['val_subset']
 
     # model
     config.model.N = params['N']
@@ -366,7 +376,18 @@ def main(params: dict):
     train_loader = torch.utils.data.DataLoader(train_dataset, config.batch_size, shuffle=True, pin_memory=True)
 
     val_dataset = TrafficDataset(clean_data, (config.data.val_start_idx + config.model.T_p, config.data.test_start_idx - config.model.T_p + 1), config)
+    # Per-epoch validation samples the diffusion model, so it costs ~8x a training
+    # epoch on the full split. Score a fixed subset instead of validating less
+    # often: validation still runs *every* epoch, which is what ReduceLROnPlateau's
+    # patience, the early-stop counter and the per-epoch setup_seed() reset are all
+    # tied to. Evenly spaced rather than the leading block of the upstream comment
+    # below -- PEMS08 error swings with time of day, so a contiguous slice only
+    # covers part of the cycle.
     # val_dataset   = TrafficDataset(clean_data, (config.data.val_start_idx + config.model.T_p, config.data.val_start_idx + config.model.T_p + 512), config)
+    if config.val_subset and config.val_subset < len(val_dataset):
+        idx = np.unique(np.linspace(0, len(val_dataset) - 1, config.val_subset).astype(int))
+        val_dataset = torch.utils.data.Subset(val_dataset, idx.tolist())
+    print(f'val windows used for model selection: {len(val_dataset)}')
     val_loader = torch.utils.data.DataLoader(val_dataset, 64, shuffle=False)
 
     test_dataset = TrafficDataset(clean_data, (config.data.test_start_idx + config.model.T_p, -1), config)

@@ -55,16 +55,64 @@ proxy_refresh                       # 手动刷新订阅
 
 ## 训练期验证开销
 
-原始实现每个 epoch 后都会在验证集上执行一次完整采样评估。该步骤耗时较高，并且会影响学习率调度、best checkpoint 选择和 early stopping，因此不能简单跳过后仍声称结果完全等价。
+原始实现每个 epoch 后在完整验证集（PEMS08 = 3548 个窗口）上做一次采样评估。实测该步
+620 s，而训练本身只有 75 s —— 单 epoch 12.2 min 里 89% 花在验证上，跑满 300 epoch 需
+61 h，超过单 seed 48 h 的墙钟上限（见「实验记录 / 2026-08-28 中止的一轮」）。
 
-复现时区分两类运行：
-- 调试运行：可降低验证频率或使用少量 batch，目的是检查代码、数据和日志链路。
-- 正式运行：保持完整验证与最终 test 流程，用于报告可对比指标。
+**采用的做法：每个 epoch 照常验证，但只评估固定的 512 个等距窗口**（`--val_subset`，
+默认 512，0 表示全量）。**不采用「隔 k 个 epoch 验证一次」**——这份代码有三样东西挂在
+「本 epoch 是否验证」上，降频会改掉它们的语义：
 
-如需加速正式实验，应明确记录验证频率、checkpoint 选择规则和最终 test 配置，避免把工程加速与论文指标复现混在一起。
+| | 隔 k 个 epoch 验证 | 每 epoch 验固定子集 |
+| --- | --- | --- |
+| `scheduler.step()`（在 `if epoch >= start_epoch` 块内，`train.py:462`） | 每 k epoch 才调一次，`ReduceLROnPlateau(patience=5)` 实际变成 5k 个 epoch | 每 epoch 照常，patience 仍是 5 |
+| 早停 `epoch - best_epoch > 10` | 11 个 epoch 里只剩约 11/k 次刷新 best 的机会，系统性提前停 | 仍是 11 次 |
+| 训练 batch 顺序（`evals()` 开头 `setup_seed()` 重置 CPU RNG，`train_loader` 每 epoch 的 shuffle 种子取自该 RNG） | 被跳过的 epoch 没有重置，batch 顺序改变 | 每 epoch 照常重置，batch 顺序不变 |
+
+即：子集只改变**测量精度**，降频会改变**实验规则**。
+
+子集尺寸是测出来的，不是拍的。方法：用 epoch 135 的 checkpoint 在全量验证集上跑一次
+（`ddpm`-200、`n_samples=1`，与 `evals(mode='Val')` 一致），记下每个窗口的误差，之后各
+尺寸子集离线计算；每个尺寸取 8 组不同偏移的等距抽样。
+
+| 子集 | MAE 偏置 \|max\| | 偏置 sd | 单 epoch |
+| --- | --- | --- | --- |
+| 256 | 0.399 | 0.255 | ~2.5 min |
+| **512** | **0.206** | **0.114** | **~3.0 min** |
+| 1024 | 0.234 | 0.131 | ~4.5 min |
+| 2048 | 0.060 | 0.041 | ~7.7 min |
+| 全量 3548（MAE 25.0352） | — | — | 12.2 min |
+
+512 → 1024 偏置没有改善：相邻窗口共享 12 个时间步里的 11 个，误差高度自相关，等距抽样
+的有效样本量不随 n 线性增长。真要提精度得上 2048，但那会让单 seed 超过 48 h 上限。故取
+**512**（也正是上游作者自己注释掉的那行的尺寸，但改成等距抽样——连续切片只覆盖一天中的
+一段，PEMS08 误差随时段波动很大）。
+
+实测确认（`evals(mode='Val')` 同一条代码路径，512 窗口）：**91.3 s**，单 epoch 由 12.2 min
+降到 **3.0 min**，跑满 300 epoch 为 **14.9 h/seed、三个 seed 44.6 h**，稳在 `MAX_HOURS=48`
+的单 seed 上限内。
+
+那个 0.114 是「换一组窗口」时偏置的抖动；实际只用一组固定窗口，该偏置对 epoch 间比较是
+常数。训练中期（LR 调度与早停真正做决策的阶段）val MAE 每 epoch 变化 0.1~0.5，远在子集
+分辨力之内；后期每 epoch 只变 0.01，子集分辨不了，但那时选哪个 epoch 当 best 对最终模型
+的影响也就 0.01。
+
+**最终指标不受影响**：test 阶段仍是全量 test 集 + `ddim_multi`-40 + `n_samples=8` + 样本
+均值，与原文 Table 2 的协议一致（原文原话：*"we report MAE and RMSE of the deterministic
+forecasting results by averaging S (set to 8) generated samples"*）。副作用：日志里打印的
+val MAE 带一个 ≤0.2 的固定偏移，**不能与全量验证的历史日志直接比较**。
 
 ## `train.py` 改动
 
+- 新增 `--val_subset`（默认 512）：每 epoch 的验证只评估固定的等距子集。理由、实测数据与
+  为什么不降频，见上一节。metrics CSV 同步新增 `val_subset` 列（`save2file_meta` 会自动为
+  旧行补 -1）。
+- `--start_epoch` 默认保持 0，且 `scripts/run_3seeds_shutdown.sh` 的 `START_EPOCH` 默认由
+  20 改回 **0**：验证变便宜之后它只省约 1 小时，不值得为此保留一条会改变训练轨迹的偏离。
+  下面那条关于 `--start_epoch > 0` 的副作用因此不再适用于正式运行（参数本身保留）。
+- 更正一条此前记录过头的说法：`model.train()` 那个修复在**本配置下数值上是 no-op**。UGnet
+  里只有 `nn.Dropout` 且 `dropout=0.0`，没有 BatchNorm，train/eval 模式对前向没有影响。
+  修复仍然保留（改 `dropout > 0` 时才是对的），但不应把它算作与原文的行为差异。
 - 新增 `--start_epoch`（默认 0，不改变原行为）：跳过最前面几个 epoch 的验证。之所以安全，是因为 `Metric.best_metrics['epoch']` 初始值是 `np.inf`，跳过期间不会误存 checkpoint、不会误触发 early stop，scheduler 的 patience 计数也只从真正开始验证的 epoch 起算。这个跳过仅限"训练最前面几个 epoch"，中途/全程降低验证频率仍适用上一节的结论（不能视为等价）。
 - 修复了一个原仓库自带的 bug：`evals()` 里会调用 `model.eval()`，但训练循环从未调用 `model.train()`，导致第一次验证之后所有训练 batch 实际上都在 eval 模式下跑（UGnet 里的 `nn.Dropout` 一直失效）。现已在每个 epoch 的训练 batch 循环前显式加上 `model.train()`。
 - `--start_epoch > 0` 的副作用（需记录在案）：`evals()` 开头的 `setup_seed()` 会重置全局 CPU RNG，而 `train_loader` 每个 epoch 建迭代器时从该 RNG 取 shuffle 种子，所以原实现里从 epoch 1 起每个 epoch 的 batch 顺序都是同一个。跳过前若干 epoch 的验证 = 跳过这次重置，被跳过的 epoch 反而是正常 shuffle。因此 `--start_epoch 20` 不只是省时间，也轻微改变了训练轨迹，不能声称与原文逐 step 等价。
@@ -89,10 +137,15 @@ bash scripts/run_3seeds_shutdown.sh
 按 `Ctrl-B D` detach，之后断开 SSH 也不影响运行。
 **注意** attach 状态下按 `Ctrl-C` 会打死训练。
 
-环境变量：`DATASET=PEMS08` `START_EPOCH=20` `GPU=0` `SEEDS="2022 2023 2024"`
+环境变量：`DATASET=PEMS08` `START_EPOCH=0` `VAL_SUBSET=512` `GPU=0` `SEEDS="2022 2023 2024"`
 `MAX_HOURS=48`（单 seed 墙钟上限，0 关闭）`SKIP_SMOKE=1`（跳过冒烟）
 `COMMIT_RESULTS=0`（不自动 commit 结果）`NO_SHUTDOWN=1`（跑完不关机）
+`SHUTDOWN_GRACE_MINUTES=30`（关机前真等多少分钟，0 表示立即关机）
 `SHUTDOWN_ON_EARLY_FAIL=1`（没跑出结果时也关机，默认不关）。
+
+**取消关机**（倒计时开始后）：tmux 里 `Ctrl-C`，或从任何地方
+`touch /root/projects/DiffSTG/output/.cancel_shutdown`。
+**不要敲 `shutdown -c`** —— 这台机器上它等于立刻关机。
 
 **关机策略**：满足以下任一条件时**保持开机、也不 commit**，好让你直接看到报错——
 
@@ -112,6 +165,9 @@ tmux attach -t diffstg-3seeds
 # 进度：只看日志，不进 tmux
 tail -F output/log/run_3seeds_*.log      # 实时 batch 级进度
 tail -n 30 output/log/summary_3seeds_*.log  # 每个 seed 的起止与耗时
+
+# 上一轮（或当前这轮）是成是败，固定路径
+cat output/last_run.json
 
 # GPU 负载 / 显存 / 进程
 nvidia-smi          # 一次性
@@ -139,6 +195,23 @@ scripts/remote_dev.sh tmux diffstg-3seeds     # attach；不要带命令，带�
 
 判断某个 seed 是否收工：`output/log/` 里出现 `[PEMS08]mae<数值>+...+<seed>.log`，
 同时 `output/metrics/DiffSTG.csv` 多出一行。
+
+## 从 checkpoint 补测
+
+`train.py` 只在训练循环**正常返回之后**才跑 test。被墙钟上限、断电或人为中止打断的运行，
+盘上留着一个完好的 best checkpoint，却一个指标都没有。`scripts/test_from_checkpoint.py`
+补这个洞：它加载 checkpoint 并调用**同一个** `evals(mode='test')`，指标由同一条代码路径产出，
+不是另写一遍。
+
+```bash
+uv run --frozen --no-sync python scripts/test_from_checkpoint.py \
+  --ckpt output/model/<trial>.dm4stg --data PEMS08 --gpu 0 --seed 2022 \
+  --epoch 300 --best_epoch <best> --start_epoch <se>
+```
+
+默认协议就是 `train.py` 最终 test 的协议（全量 test 集、`ddim_multi`-40、`n_samples=8`）。
+日志与预测 pickle 带 `.testonly` 后缀——`train.py` 用 `mode="w"` 开日志，沿用原 trial 名会
+把训练日志截断。`--best_epoch` 等训练侧信息无法从 checkpoint 反推，需显式传入，会原样写进 CSV。
 
 ## 结果在哪
 
@@ -248,3 +321,47 @@ git pull
 已知缺口：没有 resume。训练中途崩溃只能从头再来（best checkpoint 仍在盘上）。
 考虑到 early stop 会把实际 epoch 数压到远低于 300，且 resume 逻辑本身有写错、
 反过来污染复现结果的风险，暂不引入。
+
+
+# 实验记录
+
+## 2026-08-28 中止的一轮
+
+第一次 3-seed 正式运行，**人为中止，未产出可用于论文的结果**。留档是因为它测出了「全量验证
+跑不完」这个结论，以及一个可对比的中途 checkpoint 成绩。
+
+| | |
+| --- | --- |
+| 配置 | `START_EPOCH=20` `MAX_HOURS=48`，全量验证（3548 窗口），code commit `978714d` |
+| 起止 | 2026-08-28 01:53 → 2026-08-29 02:24（seed 2022 单独跑了 25 h） |
+| 进度 | 只跑到 seed 2022 的 code epoch 135（日志显示 `136.0`），2023/2024 未开始 |
+| 状态 | `output/last_run.json` 里 `status=aborted` |
+
+**为什么中止**：实测单 epoch 12.2 min，其中验证 620 s、训练仅 75 s。跑满 300 epoch 需 61 h，
+超过单 seed 48 h 的墙钟上限——也就是说**三个 seed 一个都到不了 test 阶段**，`timeout` 的
+SIGTERM 会在 epoch ~250 处把进程杀掉，`output/metrics/DiffSTG.csv` 一行都不会有。这不是运气
+问题，是配置必然，所以停下来改成 `--val_subset 512` 重跑。
+
+**中途 checkpoint 的成绩**（epoch 135 的 best checkpoint，用 `scripts/test_from_checkpoint.py`
+按原文协议在全量 test 集上补测：`ddim_multi`-40、`n_samples=8`、样本均值）：
+
+| | MAE | RMSE | MAPE | CRPS | MIS |
+| --- | --- | --- | --- | --- | --- |
+| 本轮 epoch 135（未收敛） | 26.74 | 37.10 | 18.21 | 0.0946 | 441.37 |
+| 原文 Table 2 | **17.68** | **27.13** | — | **0.06** | — |
+| SpecSTG 复现的 DiffSTG（PEMS08F） | 18.99 | 28.26 | — | 0.0692 | — |
+
+停止时 val MAE 仍在下降（best 连续落在 epoch 130~135），所以这不是收敛值。协议已逐条核对
+与原文一致：split 6:2:2（10713/14284/17856）、`T_h=T_p=12`、batch 8、lr 0.002、8 样本均值。
+差距是真实的，不是协议错配，需要跑满 300 epoch 后再判断。
+
+参考：原文 [arXiv 2301.13629](https://arxiv.org/abs/2301.13629)；
+SpecSTG [arXiv 2401.08119](https://arxiv.org/abs/2401.08119)，其中明确写过
+*"The validation time of DiffSTG is significantly high because it requires sampling and
+prediction during validation."*
+
+**保留的产物**（`output/model/` 与 `output/forecast/` 不进 git，只在 host 上）：
+
+- `output/log/PEMS08_..._se20_e300_s2022_f62798.log` —— 136 个 epoch 的完整曲线
+- `output/model/PEMS08_..._se20_e300_s2022_f62798.dm4stg` —— epoch 135 的 best checkpoint
+- `output/log/PEMS08_..._f62798.testonly.log` + CSV 中对应行 —— 上表的补测结果
