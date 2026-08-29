@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "success",
-  "shutdown": "pending",
+  "shutdown": "poweroff",
   "exit_status": 0,
   "run_tag": "PEMS08_start0_20260829-031556",
   "dataset": "PEMS08",
@@ -10,9 +10,9 @@
   "seeds": ["2022", "2023", "2024"],
   "failed_seeds": [],
   "started": "2026-08-29T03:15:56+0800",
-  "finished": "2026-08-30T02:12:42+0800",
+  "finished": "2026-08-30T02:42:43+0800",
   "code_commit": "44c0d36",
-  "results_commit": null,
+  "results_commit": "834f313",
   "summary_log": "/root/projects/DiffSTG/output/log/summary_3seeds_PEMS08_start0_20260829-031556.log",
   "raw_log": "/root/projects/DiffSTG/output/log/run_3seeds_PEMS08_start0_20260829-031556.log",
   "checkpoints": ["output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2022_6788e0.dm4stg", "output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2022_6788e0.last.dm4stg", "output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2023_13a8c7.dm4stg", "output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2023_13a8c7.last.dm4stg", "output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2024_51bc02.dm4stg", "output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2024_51bc02.last.dm4stg", "output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se20_e300_s2022_f62798.dm4stg", "output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se20_e300_s2022_f62798.last.dm4stg", "output/model/test_PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e2_s2022_af9730.dm4stg", "output/model/test_PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e2_s2022_af9730.last.dm4stg", "output/model/test_PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e2_s2022_bbaae7.dm4stg", "output/model/test_PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e2_s2022_bbaae7.last.dm4stg"]

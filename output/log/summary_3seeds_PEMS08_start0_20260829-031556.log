@@ -34,3 +34,20 @@ PEMS08,UGnet,200,UGnet,32,12,12,ddim_multi,40,0.1,8,300,150,0,512,2023,8,0.002,1
 PEMS08,UGnet,200,UGnet,32,12,12,ddim_multi,40,0.1,8,300,91,0,512,2024,8,0.002,1e-05,10,False,2:12:40,21.206242,30.883963,14.748766,0.07362516930228785,309.67825,1009.3026301674545,/root/projects/DiffSTG/output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2024_51bc02.dm4stg,/root/projects/DiffSTG/output/log/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2024_51bc02.log,/root/projects/DiffSTG/output/forecast/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2024_51bc02.pkl
 
 [INFO] === commit results ===
+[OK] results committed as 834f313 on feature/reproduction
+[INFO] not pushed by design; run `git push` after powering the host back on.
+[INFO] checkpoints and forecast pickles stay on this host (gitignored).
+[INFO] result status=0; local summary=output/log/summary_3seeds_PEMS08_start0_20260829-031556.log; raw transcript=output/log/run_3seeds_PEMS08_start0_20260829-031556.log
+[INFO] powering off in 30 minute(s).
+[INFO] to cancel: Ctrl-C in this pane, or `touch /root/projects/DiffSTG/output/.cancel_shutdown`.
+[INFO] do NOT run `shutdown -c` here: shutdown ignores its arguments on this
+[INFO] host and powers the container off instead of cancelling.
+[INFO] powering off in 00:30:00
+[INFO] powering off in 00:25:00
+[INFO] powering off in 00:20:00
+[INFO] powering off in 00:15:00
+[INFO] powering off in 00:10:00
+[INFO] powering off in 00:05:00
+[INFO] powering off in 00:01:00
+[INFO] powering off in 00:00:30
+[INFO] powering off now at 2026-08-30T02:42:43+0800
