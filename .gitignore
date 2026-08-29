@@ -21,9 +21,10 @@ build/
 dist/
 *.egg-info/
 
-# Training artifacts. Metrics and the clean per-run logs are tracked so results
-# reach other devices through git; checkpoints, forecast pickles and the raw
-# runner transcript (one huge \r-laden line) stay on the GPU host.
+# Training artifacts. Metrics, the clean per-run logs and the best-val
+# checkpoints are tracked so results reach other devices through git; forecast
+# pickles and the raw runner transcript (one huge \r-laden line, regenerable)
+# stay on the GPU host.
 output/*
 !output/log/
 !output/metrics/
@@ -34,6 +35,20 @@ output/log/*
 output/log/run_3seeds_*.log
 output/metrics/*
 !output/metrics/*.csv
+
+# Best-val checkpoints are tracked: 4.5 MB each, and training is NOT bit-wise
+# reproducible (cudnn.benchmark is left on, no use_deterministic_algorithms), so
+# a lost checkpoint cannot be regenerated -- only re-trained at ~9 h/seed. They
+# are what lets a finished run be re-tested under a different sampling protocol
+# (see reproduction_note.md, 2026-08-29). !output/model/ must come first: once a
+# directory is excluded, git cannot un-ignore files inside it.
+!output/model/
+output/model/*
+!output/model/*.dm4stg
+# per-epoch crash snapshot; superseded by the best checkpoint once a run finishes
+output/model/*.last.dm4stg
+# smoke-test artifacts (2-epoch model, mae 345)
+output/model/test_*.dm4stg
 output_remote/
 
 # Machine-local remote-dev config (SSH host, paths) — see scripts/remote_dev.sh

@@ -14,7 +14,9 @@
 
 ## A. 补齐三个 seed 的 `ddpm`-200 指标
 
-- [ ] **A1. 确认盘上的东西还在**
+- [x] ~~**A1. 确认盘上的东西还在**~~ —— 2026-08-30 02:53 已确认：`status=success`、
+      `shutdown=poweroff`、`failed_seeds=[]`；三个 best checkpoint 都在（各 4449311 B），
+      关机后手动重开机,文件完好。
 
   ```bash
   python3 -c "import json;d=json.load(open('output/last_run.json'));print(d['status'],d['shutdown'],d['failed_seeds'])"
@@ -76,7 +78,8 @@
    一个 70 MB 的文件早就在 git 里。GitHub 单文件警告线 50 MB、硬上限 100 MB。
    **不需要 git-lfs,别引入。**
 
-- [ ] **B1. 改 `.gitignore`**,接在现有 `output/` 规则之后。
+- [x] ~~**B1. 改 `.gitignore`**~~ —— 已加，规则见文件 43-51 行；同时更新了上方那段
+      "checkpoints ... stay on the GPU host" 的注释（checkpoint 现在进 git 了）。原文如下：,接在现有 `output/` 规则之后。
       `!output/model/` 必须在 `output/model/*` **之前** —— 目录一旦被排除,里面的文件就再也
       un-ignore 不回来了。
 
@@ -95,14 +98,17 @@
   output/model/test_*.dm4stg
   ```
 
-- [ ] **B2. 确认只纳入了 3 个 best checkpoint**(不是 `.last`,不是冒烟的 `test_*`)
+- [x] ~~**B2. 确认只纳入了 3 个 best checkpoint**~~ —— 实际是 **4 个，17 MB**：除三个 seed 外
+      还纳入了 `..._se20_e300_s2022_f62798.dm4stg`（2026-08-28 中止那轮 epoch 135 的 checkpoint，
+      即 reproduction_note 里 26.74 那行的来源）。多 4.45 MB，换那条历史记录可复算，值。
+      `.last.dm4stg` 与 `test_*` 已确认被规则命中排除。(不是 `.last`,不是冒烟的 `test_*`)
 
   ```bash
   git status --short output/model/     # 期望恰好 3 个 ?? 行,都是 *_s202{2,3,4}_*.dm4stg
   git check-ignore -v output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2022_6788e0.last.dm4stg
   ```
 
-- [ ] **B3. commit + push**(无卡模式开机即可,不烧 GPU)
+- [x] ~~**B3. commit + push**~~ —— 见下方 commit。(无卡模式开机即可,不烧 GPU)
 
   ```bash
   git add .gitignore output/model/*.dm4stg
