@@ -97,10 +97,14 @@ proxy_refresh                       # 手动刷新订阅
 分辨力之内；后期每 epoch 只变 0.01，子集分辨不了，但那时选哪个 epoch 当 best 对最终模型
 的影响也就 0.01。
 
-**最终指标不受影响**：test 阶段仍是全量 test 集 + `ddim_multi`-40 + `n_samples=8` + 样本
+**最终指标不受影响**：test 阶段仍是全量 test 集 + `n_samples=8` + 样本
 均值，与原文 Table 2 的协议一致（原文原话：*"we report MAE and RMSE of the deterministic
 forecasting results by averaging S (set to 8) generated samples"*）。副作用：日志里打印的
 val MAE 带一个 ≤0.2 的固定偏移，**不能与全量验证的历史日志直接比较**。
+
+> **2026-08-29 更正**：这一段原本写的是「test 阶段仍是全量 test 集 + `ddim_multi`-40 +
+> …… 与原文 Table 2 的协议一致」。采样器那半句是错的——`ddim_multi`-40 不是原文的采样器，
+> 见「实验记录 / 2026-08-29」。`val_subset` 本身的结论不受影响。
 
 ## `train.py` 改动
 
@@ -360,6 +364,9 @@ SIGTERM 会在 epoch ~250 处把进程杀掉，`output/metrics/DiffSTG.csv` 一�
 与原文一致：split 6:2:2（10713/14284/17856）、`T_h=T_p=12`、batch 8、lr 0.002、8 样本均值。
 差距是真实的，不是协议错配，需要跑满 300 epoch 后再判断。
 
+> **2026-08-29 更正**：上面这句话是错的。差距**正是**协议错配——发布代码在 test 阶段
+> 写死的 `ddim_multi`-40 不是产出原文 Table 2 的采样器。见下一节。
+
 参考：原文 [arXiv 2301.13629](https://arxiv.org/abs/2301.13629)；
 SpecSTG [arXiv 2401.08119](https://arxiv.org/abs/2401.08119)，其中明确写过
 *"The validation time of DiffSTG is significantly high because it requires sampling and
@@ -370,3 +377,85 @@ prediction during validation."*
 - `output/log/PEMS08_..._se20_e300_s2022_f62798.log` —— 136 个 epoch 的完整曲线
 - `output/model/PEMS08_..._se20_e300_s2022_f62798.dm4stg` —— epoch 135 的 best checkpoint
 - `output/log/PEMS08_..._f62798.testonly.log` + CSV 中对应行 —— 上表的补测结果
+
+## 2026-08-29 发布代码的 test 采样器不是原文协议（21.67 → 17.90）
+
+**结论：`train.py` 在 test 阶段写死的 `ddim_multi`-40 不是产出原文 Table 2 的采样器。同一个
+checkpoint 换成 `ddpm`-200 后 MAE 由 21.67 降到 17.90，落在原文 17.68 的 0.22 以内。
+不需要重训，`beta_end` 保持 0.1。**
+
+| | MAE | RMSE | MAPE | CRPS | MIS |
+| --- | --- | --- | --- | --- | --- |
+| 原文 Table 2 | 17.68 | 27.13 | — | 0.06 | — |
+| **本复现 seed 2022 · `ddpm`-200** | **17.90** | **27.31** | 11.32 | **0.0611** | 215.39 |
+| SpecSTG 复现的 DiffSTG（PEMS08F） | 18.99 | 28.26 | — | 0.0692 | — |
+| 本复现 seed 2022 · `ddim_multi`-40（发布默认） | 21.67 | 31.37 | 14.19 | 0.0753 | 316.81 |
+
+对照的唯一变量是采样器：同一份 `..._s2022_6788e0.dm4stg`（best_epoch 173）、全量 test 集
+3549 窗口、`n_samples=8` 样本均值、同一个 `evals(mode='test')` 代码路径、`beta_end` 由
+`test_from_checkpoint.py` 从 checkpoint 读出仍是 0.1。
+
+### 机制
+
+`algorithm/diffstg/model.py:107-109` 的 DDIM 时间表把最大步截在 **0.8N**：
+
+```python
+seq = (np.linspace(0, np.sqrt(N * 0.8), timesteps) ** 2)  # N=200 → max t = 160，不是 199
+x = torch.randn([B, F, V, T])                             # 纯高斯噪声
+```
+
+采样从纯噪声起步，却把它标成 t=160；而训练时 `x_160 = 0.153·x0 + 0.988·ε`，模型**期望那里
+还带着 15.3% 的干净信号**。紧接着第一步 `x0_t = (xt - et·√(1-at)) / √at`，其中
+`at = ᾱ[160] = 0.0235`，把这一步的预测误差放大 **6.5 倍**。`ddpm` 走 `p_sample_loop`，
+从 t=199 起步，那里只剩 2.85%。
+
+残留比例完全由 `beta_end` 决定，而原文明说 β_N 是搜出来的（`N ∈ {50,100,200}`、
+`β_N ∈ {0.1,0.2,0.3,0.4}`、`M ∈ {40,100}`）：
+
+| N | β_N | √ᾱ[N-1] | √ᾱ[0.8N]（DDIM 起点残留） |
+| --- | --- | --- | --- |
+| 200 | **0.1** | 0.0285 | **0.1533** ← 发布默认 |
+| 200 | 0.2 | 0.0007 | 0.0231 |
+| 200 | 0.3 | 0.0000 | 0.0032 |
+
+发布默认正是这一列里 mismatch 最大的点。但换 `ddpm` 就绕开了起点问题，**没有必要为此重训**。
+
+`ddim_multi` 的 `seq` 另有 3 个重复步（`M=40` 时开头四个 0；`M=100` 时 16 个重复），属于
+白跑的迭代，与本条结论无关，记录备查。
+
+### 附带确认
+
+- **模型选择没受影响**：训练期 `config.model.sample_strategy` 一直是 `ddpm`，
+  `evals(mode='Val')` 走的就是 `p_sample_loop`，best_epoch 是在正确的采样器下选出来的。
+- **`--sample_steps` 对 `ddpm` 路径是装饰性的**：`p_sample_loop` 恒定循环 `self.N` 步，
+  该参数只写进 CSV，不影响计算。
+- **`pos_w` / `pos_d` 全程未被使用**（`ugnet.py:253` 解包后不引用，`is_label_condition`
+  无人读）——这与原文一致：原文的 condition 只有 masked 历史、图 `G` 和噪声步 `n`，不含
+  time-of-day / day-of-week 嵌入。**不是**差距来源，也不应擅自加上。
+- **潜在 bug（当前无害）**：`model.py:124` 的 `x_masked, _, _ = input` 把 `_` 绑定两次，
+  于是 `(x_masked, _, _)` 传下去的其实是 `(x_masked, pos_d, pos_d)`，`pos_w` 丢失；且
+  `x_masked` 被复制成 `B×n_samples` 而两个 pos 没有。因为 UGnet 两者都不用，现在是 no-op，
+  一旦引入时间嵌入会立刻炸。
+
+### 复现命令
+
+```bash
+uv run --frozen --no-sync python scripts/test_from_checkpoint.py \
+  --ckpt output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2022_6788e0.dm4stg \
+  --data PEMS08 --gpu 0 --seed 2022 --best_epoch 173 --val_subset 512 \
+  --sample_strategy ddpm --sample_steps 200 --n_samples 8 --tag ddpm200
+```
+
+全量 test 集耗时 9591 s（与 seed 2023 的训练抢卡；独占约 5000 s，`ddim_multi`-40 为 1012 s）。
+
+### 本轮 3-seed 状态
+
+`run_3seeds_PEMS08_start0_20260829-031556`，code commit `44c0d36`，`START_EPOCH=0`
+`VAL_SUBSET=512`。CSV 里每个 seed 由 `train.py` 自动写的那一行是 `ddim_multi`-40，需要
+按上面的命令逐个补 `ddpm`-200（见 `TODO.md`）。
+
+| seed | 训练耗时 | best_epoch | `ddim_multi`-40 | `ddpm`-200 |
+| --- | --- | --- | --- | --- |
+| 2022 | 08:59:14 | 173 | 21.67 | **17.90** |
+| 2023 | 08:48:23 | 150 | 21.08 | 待补 |
+| 2024 | 进行中 | 待定 | 待定 | 待补 |
