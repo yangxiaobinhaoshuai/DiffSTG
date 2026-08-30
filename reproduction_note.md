@@ -17,9 +17,14 @@ git pull              # host：拉下来再跑
 
 | 进 git | 留在 host |
 | --- | --- |
-| `output/metrics/*.csv` 最终指标 | `output/model/` checkpoint |
-| `output/log/*.log` 每个 seed 的 epoch 级日志 | `output/forecast/` 预测 pickle |
-| `output/log/summary_3seeds_*.log` 运行摘要 | `output/log/run_3seeds_*.log` 原始 transcript |
+| `output/metrics/*.csv` 最终指标 | `output/forecast/` 预测 pickle |
+| `output/log/*.log` 每个 seed 的 epoch 级日志 | `output/log/run_3seeds_*.log` 原始 transcript |
+| `output/log/summary_3seeds_*.log` 运行摘要 | `output/model/*.last.dm4stg` 每 epoch 快照 |
+| `output/model/*.dm4stg` best-val checkpoint | |
+
+checkpoint 自 2026-08-30（commit `d85584f`）起纳入 git：4.5 MB/个，而训练不是逐位可复现的
+（`cudnn.benchmark` 没关、没有 `use_deterministic_algorithms`），**丢了就只能按 ~9 h/seed 重训**。
+它也是换采样协议重测的唯一依赖 —— 本轮的 `ddpm`-200 数字全靠它。
 
 原始 transcript 不进 git 是因为 `train.py` 的进度条用 `\r` 且不换行，整份文件基本是一行，git diff 没法看；它的结构化内容都在 summary log 里。
 
@@ -385,7 +390,7 @@ SpecSTG [arXiv 2401.08119](https://arxiv.org/abs/2401.08119)，其中明确写�
 *"The validation time of DiffSTG is significantly high because it requires sampling and
 prediction during validation."*
 
-**保留的产物**（`output/model/` 与 `output/forecast/` 不进 git，只在 host 上）：
+**保留的产物**（checkpoint 现已进 git，见上方 `output/` 分工表；`output/forecast/` 仍只在 host 上）：
 
 - `output/log/PEMS08_..._se20_e300_s2022_f62798.log` —— 136 个 epoch 的完整曲线
 - `output/model/PEMS08_..._se20_e300_s2022_f62798.dm4stg` —— epoch 135 的 best checkpoint
