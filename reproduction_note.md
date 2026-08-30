@@ -125,6 +125,19 @@ val MAE 带一个 ≤0.2 的固定偏移，**不能与全量验证的历史日�
 - 新增 `--start_epoch`（默认 0，不改变原行为）：跳过最前面几个 epoch 的验证。之所以安全，是因为 `Metric.best_metrics['epoch']` 初始值是 `np.inf`，跳过期间不会误存 checkpoint、不会误触发 early stop，scheduler 的 patience 计数也只从真正开始验证的 epoch 起算。这个跳过仅限"训练最前面几个 epoch"，中途/全程降低验证频率仍适用上一节的结论（不能视为等价）。
 - 修复了一个原仓库自带的 bug：`evals()` 里会调用 `model.eval()`，但训练循环从未调用 `model.train()`，导致第一次验证之后所有训练 batch 实际上都在 eval 模式下跑（UGnet 里的 `nn.Dropout` 一直失效）。现已在每个 epoch 的训练 batch 循环前显式加上 `model.train()`。
 - `--start_epoch > 0` 的副作用（需记录在案）：`evals()` 开头的 `setup_seed()` 会重置全局 CPU RNG，而 `train_loader` 每个 epoch 建迭代器时从该 RNG 取 shuffle 种子，所以原实现里从 epoch 1 起每个 epoch 的 batch 顺序都是同一个。跳过前若干 epoch 的验证 = 跳过这次重置，被跳过的 epoch 反而是正常 shuffle。因此 `--start_epoch 20` 不只是省时间，也轻微改变了训练轨迹，不能声称与原文逐 step 等价。
+- **test 采样协议由 `ddim_multi`-40 改为 `ddpm`-200**（`train.py` 的 `for sample_strategy,
+  sample_steps in [...]`）。发布代码的默认值不是原文协议：`ddim_multi` 的 `seq` 从
+  t=0.8N 起步，而 `beta_end=0.1` 在那里还留着 15.3% 的干净信号、采样器却只喂纯噪声，
+  实测值 3.5 MAE（seed 2022：21.67 → 17.90）。完整推导见下方
+  「2026-08-29 发布代码的 test 采样器不是原文协议」。改了之后跑完就是可报告的数字，
+  不必再用 `scripts/test_from_checkpoint.py` 逐个补测。`sample_steps` 对 `ddpm` 路径是
+  装饰性的（`p_sample_loop` 恒定循环 `self.N` 步），填 200 只为让 CSV 行如实反映协议。
+- **修 bug**：`evals()` 的 `mode == 'test'` 分支里，写 forecast pickle 前对切片补
+  `.clone()`。`torch.cat(samples, dim=0)[:50]` 返回的是**视图**，pickle 会连同底下整个
+  storage（全部 3549 个窗口）一起序列化：逻辑数据 9.0 MB，落盘 522.1 MB（samples 463 MB
+  + targets 58 MB），4 个文件合计 2.0 GB。`observed_flag` / `evaluate_flag` 是
+  `ones_like` 新分配的，所以不受影响。**不能用 `.contiguous()`** —— 该切片本身连续，
+  `contiguous()` 会原样返回同一个视图。修后单个 pickle 约 9 MB。
 
 
 
@@ -451,11 +464,40 @@ uv run --frozen --no-sync python scripts/test_from_checkpoint.py \
 ### 本轮 3-seed 状态
 
 `run_3seeds_PEMS08_start0_20260829-031556`，code commit `44c0d36`，`START_EPOCH=0`
-`VAL_SUBSET=512`。CSV 里每个 seed 由 `train.py` 自动写的那一行是 `ddim_multi`-40，需要
-按上面的命令逐个补 `ddpm`-200（见 `TODO.md`）。
+`VAL_SUBSET=512`。当时 CSV 里每个 seed 由 `train.py` 自动写的那一行是 `ddim_multi`-40，
+三个 seed 的 `ddpm`-200 都是事后用上面那条命令从 checkpoint 补测的（2026-08-30 补齐）。
+`train.py` 此后已改为直接跑 `ddpm`-200，新的运行不再需要补测。
 
-| seed | 训练耗时 | best_epoch | `ddim_multi`-40 | `ddpm`-200 |
+| seed | 训练耗时 | best_epoch | `ddim_multi`-40 MAE | `ddpm`-200 MAE |
 | --- | --- | --- | --- | --- |
 | 2022 | 08:59:14 | 173 | 21.67 | **17.90** |
-| 2023 | 08:48:23 | 150 | 21.08 | 待补 |
-| 2024 | 进行中 | 待定 | 待定 | 待补 |
+| 2023 | 08:48:23 | 150 | 21.08 | **18.05** |
+| 2024 | 05:08:33 | 91 | 21.21 | **17.82** |
+| **mean ± sd** | — | — | 21.32 ± 0.31 | **17.92 ± 0.11** |
+
+seed 2024 训练耗时短是因为 best_epoch 只到 91，早停触发得早。
+
+三个 seed 全量 test 集、`n_samples=8` 下的完整指标：
+
+| 协议 | MAE | RMSE | MAPE | CRPS | MIS |
+| --- | --- | --- | --- | --- | --- |
+| **`ddpm`-200（原文协议）** | **17.92 ± 0.11** | **27.34 ± 0.16** | 11.49 ± 0.18 | **0.0611 ± 0.0004** | 215.12 ± 0.36 |
+| `ddim_multi`-40（发布默认） | 21.32 ± 0.31 | 31.04 ± 0.29 | 14.20 ± 0.54 | 0.0740 ± 0.0012 | 309.38 ± 7.59 |
+| 原文 DiffSTG | 17.68 | 27.13 | — | ~0.06 | — |
+| SpecSTG 复现的 DiffSTG | 18.99 | 28.26 | — | 0.0692 | — |
+
+**结论：`ddpm`-200 下复现成功。** MAE 17.92 比原文 17.68 高 0.24（+1.4%），RMSE 高 0.21
+（+0.8%），CRPS 与原文报的 0.06 一致；三个 seed 的区间 [17.82, 18.05] 把原文值夹在外面
+0.14，属于正常的实现级差异，明显优于 SpecSTG 复现出的 18.99。
+
+### 修正一条此前基于 2 个 seed 的说法
+
+之前记的「种子 sd 是 0.42 MAE（1.95%）」取自 `ddim_multi`-40 下的 seed 2022/2023 两点。
+补齐三个 seed 后：`ddim_multi`-40 是 **0.31**，而**原文协议 `ddpm`-200 只有 0.11（0.6%）**。
+错采样器把种子间方差放大了约 3 倍 —— 它从 t=0.8N 起步，那里的预测误差被 1/√ᾱ 放大 6.5 倍，
+放大的既是偏差也是方差。
+
+所以「方法间距和种子噪声同量级」这个判断要下调：0.11 相对 DiffSTG–PriSTI 的 0.38 已有
+3 倍余量，但仍和 PriSTI–SpecSTG 的 0.24 同量级。**当 baseline 用时报 mean±std 的要求不变**，
+只是 3 个 seed 对 0.4 以上的差距够用了。注意 n=3 的 sd 本身估得很糙（自由度 2，
+95% CI 大致是点估计的 0.5–3 倍），别把 0.11 当成一个精确数字。

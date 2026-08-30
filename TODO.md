@@ -28,7 +28,11 @@
   `output/model/` 与 `output/forecast/` 是 gitignored、只在 host 上。
   若 checkpoint 不在了,A 组全部作废,只能重训 —— 这也正是 B 组存在的理由。
 
-- [ ] **A2. 补测 seed 2023 与 2024 的 `ddpm`-200**(独占 GPU 每个约 1.4 h,串行约 2.8 h)
+- [~] **A2. 补测 seed 2023 与 2024 的 `ddpm`-200** —— seed 2023 已完成（**18.05** / 27.51 /
+      CRPS 0.0615，4986 s，独占卡）。seed 2024 于 2026-08-30 04:20:33 启动后**立即被杀**
+      （日志 0 字节、`a2_ddpm200.out` 无后续输出、实例未重启）—— 起因是跑它的 tmux/shell
+      被关掉，进程作为子进程一起没了。12:07 已用 `setsid nohup` 脱离重启（PPID=1），
+      不再依赖任何 shell 存活。**教训：长任务一律 `setsid`，别只靠 tmux。**(独占 GPU 每个约 1.4 h)
 
   先取 seed 2024 的 `best_epoch`(2023 是 **150**,2022 是 173):
 
@@ -56,8 +60,11 @@
 
   **别并行跑**:抢卡会把单次从 ~5000 s 拖到 ~9600 s,串行反而更快。
 
-- [ ] **A3. 汇总三个 seed 的 mean±std**,填进 `reproduction_note.md` 末尾那张表
-      (`ddpm`-200 行,以及 `ddim_multi`-40 行作为「发布默认值」对照)。
+- [x] ~~**A3. 汇总三个 seed 的 mean±std**~~ —— 已填进 `reproduction_note.md` 末尾。
+      `ddpm`-200：**MAE 17.92 ± 0.11**,RMSE 27.34 ± 0.16,CRPS 0.0611 ± 0.0004
+      （原文 17.68 / 27.13 / ~0.06）。**复现成功**,差 0.24 MAE(+1.4%)。
+      下面那条 0.42 的种子 sd 是 2 个 seed + 错采样器下的旧数;正确协议下只有 **0.11**,
+      详见 note 里「修正一条此前基于 2 个 seed 的说法」。
 
   对照基准:原文 17.68 / 27.13 / CRPS 0.06;SpecSTG 复现 18.99 / 28.26 / 0.0692。
   已知 `ddim_multi`-40 下 seed 2022/2023 的样本 sd 是 **0.42 MAE**(1.95%),
@@ -126,7 +133,8 @@
 
 ## C. 代码修复
 
-- [ ] **C1. 修 forecast pickle 大 58 倍的 bug**
+- [x] ~~**C1. 修 forecast pickle 大 58 倍的 bug**~~ —— 2026-08-30 已改，`train.py` 的
+      `evals()` test 分支两行都加了 `.clone()`，理由写在注释里。
 
   `train.py` 的 `evals()` 里 `if mode == 'test'` 那段:
 
@@ -143,18 +151,19 @@
   **不能用 `.contiguous()`** —— 这个切片本身就是连续的,`contiguous()` 会原样返回同一个视图,
   必须 `.clone()`。修完 4 个真实 pickle 由 2.0 GB 降到 36 MB。
 
-- [ ] **C2. 把 `train.py` 的 test 协议由 `ddim_multi`-40 改成 `ddpm`-200**
+- [x] ~~**C2. 把 `train.py` 的 test 协议由 `ddim_multi`-40 改成 `ddpm`-200**~~ —— 已改。
+      `if sample_steps > config.model.N: break` 对 200 vs N=200 不触发，已确认。
 
   `train.py:520` 的 `for sample_strategy, sample_steps in [('ddim_multi', 40)]:`。
   这样以后跑完就直接是可报告的数字,不用再补测。
 
-- [ ] **C3. C1/C2 都要在 `reproduction_note.md` 的「`train.py` 改动」一节记明理由**
+- [x] ~~**C3. C1/C2 都要在 `reproduction_note.md` 的「`train.py` 改动」一节记明理由**~~ —— 已补两条。
       (AGENTS.md 第 4 条)。
 
 
 ## D. 清理
 
-- [ ] **D1. 删冒烟测试的 checkpoint 与 pickle**(mae 345 的两 epoch 模型,8.9 MB + 2.6 MB,无保留价值)
+- [x] ~~**D1. 删冒烟测试的 checkpoint 与 pickle**~~ —— 已删，共 20 MB（4 个 ckpt + 2 个 pickle）。(mae 345 的两 epoch 模型,8.9 MB + 2.6 MB,无保留价值)
 
   ```bash
   rm -f output/model/test_*.dm4stg output/forecast/test_*.pkl

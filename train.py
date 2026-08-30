@@ -279,8 +279,12 @@ def evals(model, data_loader, epoch, metric, config, clean_data, mode='Test'):
     metric.metrics['time'] = time_cost
 
     if mode == 'test': # save the prediction result to file
-        samples = torch.cat(samples, dim=0)[:50]
-        targets = torch.cat(targets, dim=0)[:50]
+        # .clone() is load-bearing: a slice is a *view*, and pickle serialises the
+        # whole underlying storage (all 3549 windows), so the 9 MB of data we
+        # actually keep landed on disk as 522 MB. .contiguous() will NOT do -- this
+        # slice is already contiguous, so it returns the same view unchanged.
+        samples = torch.cat(samples, dim=0)[:50].clone()
+        targets = torch.cat(targets, dim=0)[:50].clone()
         observed_flag = torch.ones_like(targets) #(B, T, V, F)
         evaluate_flag = observed_flag
         evaluate_flag[:, -config.model.T_p:, :, :] = 1
@@ -517,7 +521,11 @@ def main(params: dict):
 
     # conduct multiple-samples, then report the best
     metric_lst = []
-    for sample_strategy, sample_steps in [('ddim_multi', 40)]:
+    # ddpm-200 is the paper's protocol. The released default was ddim_multi-40,
+    # whose seq starts at t=0.8N where beta_end=0.1 still leaves 15.3% clean
+    # signal the sampler does not supply -- worth 3.40 MAE, mean over 3 seeds
+    # (21.32 +- 0.31 vs 17.92 +- 0.11). See reproduction_note.md, 2026-08-29.
+    for sample_strategy, sample_steps in [('ddpm', 200)]:
         if sample_steps > config.model.N: break
 
         config.model.sample_strategy = sample_strategy
