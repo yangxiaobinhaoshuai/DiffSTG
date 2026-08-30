@@ -146,6 +146,22 @@ def default_config(data='AIR_BJ', gpu_id=None):
         config.data.val_start_idx = int(17856 * 0.6)
         config.data.test_start_idx = int(17856 * 0.8)
 
+    # PEMS03/04 are not in the DiffSTG paper -- added for this thesis's evaluation.
+    # Same 6:2:2 split and 5-minute granularity as PEMS08; see reproduction_note.md.
+    if config.data.name == 'PEMS04':
+        config.data.num_features = 1
+        config.data.num_vertices = 307
+        config.data.points_per_hour = 12
+        config.data.val_start_idx = int(16992 * 0.6)
+        config.data.test_start_idx = int(16992 * 0.8)
+
+    if config.data.name == 'PEMS03':
+        config.data.num_features = 1
+        config.data.num_vertices = 358
+        config.data.points_per_hour = 12
+        config.data.val_start_idx = int(26208 * 0.6)
+        config.data.test_start_idx = int(26208 * 0.8)
+
     if config.data.name == "AIR_BJ":
         config.data.num_features = 1
         config.data.num_vertices = 34

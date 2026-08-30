@@ -146,6 +146,87 @@ val MAE 带一个 ≤0.2 的固定偏移，**不能与全量验证的历史日�
 
 
 
+## 新增数据集：PEMS03 / PEMS04（原文没有）
+
+原文只评测 PEMS08、AIR-BJ、AIR-GZ。为论文需要另加 PEMS03/PEMS04（同为 5 分钟粒度的交通流量，
+STSGCN 标准四件套里的两个）；AIR 两个是 PM2.5、不是交通，不纳入。**这不是"复现"，是把
+baseline 扩展到自己的评测集** —— 没有已发表数字可对照，PEMS08 的 17.92（对原文 17.68）
+是唯一的协议锚点，它证明 pipeline 忠实，PEMS03/04 的数字才因此可信。
+
+超参一律沿用原作者发布值（`N=200`、`beta_end=0.1`、`d_h=32`），**不做数据集特定调优** ——
+这些值是原作者在 PEMS08/AIR 上搜出来的，搬过来可能低估 DiffSTG，需在论文里列为 limitation。
+但"自己的方法调参、baseline 用默认值"是更严重的不对称，必须避免。
+
+### 数据不进 git，自己下
+
+PEMS03/04 的 `flow.npy` / `adj.npy` **不纳入版本控制**（`.gitignore`）—— 这套数据是 STSGCN
+的标准发布版，到处都能拿到，没必要让每个 clone 都背 58 MB。开源时在 README 里说明获取方式即可。
+
+需要的原始文件（放进任意目录，比如 `/root/data_raw/<NAME>/`）：
+
+| 数据集 | 文件 | 说明 |
+| --- | --- | --- |
+| PEMS04 | `PEMS04.npz`, `PEMS04.csv` | csv 的 ID 已是 0..306 |
+| PEMS03 | `PEMS03.npz`, `PEMS03.csv`, **`PEMS03.txt`** | txt 是传感器 ID → 节点下标的映射，**缺了图就是错的** |
+
+来源：STSGCN 仓库 <https://github.com/Davidham3/STSGCN> 的数据包，或 IEEE DataPort 上的
+同一份发布版。然后：
+
+```bash
+uv run --frozen --no-sync python scripts/convert_pems.py \
+  --dataset PEMS04 --raw-dir /root/data_raw/PEMS04 --out-dir data/dataset/PEMS04
+```
+
+加 `--dry-run` 只校验不写盘。脚本会打印 shape / NaN / 度分布 / 孤立点并断言全部约定，
+输出和下表对不上就说明拿错了版本。
+
+**例外**：`data/dataset/PEMS08/` 的两个文件仍然 tracked —— 它们随上游仓库进来
+（commit `b723e1e`，早已在 `origin/main` 上），撤掉要重写共享历史，而收益只是让新 clone
+少 70 MB，不值。
+
+`scripts/convert_pems.py` 负责把公开发布版转成 `train.py` 要的 `flow.npy` + `adj.npy`，
+校验全部内建。两个不做就会静默出错的点：
+
+- **只存 channel 0、且用 float32。** PEMS04 原始是 `(16992, 307, 3)` float64 = 125 MB。
+  `CleanDataset.read_data()` 本来就只取 `[:, :, 0]`，channel 1/2 是 occupancy/speed，用不到；
+  流量是整数、远在 float32 精确整数范围内，脚本里断言了转换无损。转换后 21 MB / 37 MB。
+- **PEMS03 的边表用的是原始传感器 ID（311903~318844），不是节点下标**，必须经 `PEMS03.txt`
+  映射，该文件的行序就是 npz 的节点序。注意它是 CRLF 且末尾无换行，`wc -l` 会少数一行
+  （报 357，实为 358），按行数校验会误判。PEMS04 的 ID 已是 0..306，无需映射。
+
+邻接矩阵按 PEMS08 的既有约定构建：**binary 0/1、对称、对角线为 0，距离一律丢弃**。
+很多 PEMS pipeline 默认给高斯核加权图，套错会喂给 UGnet 一个和已验证结果不同的算子。
+PEMS03 边表里有 1 个自环，已丢弃。
+
+| | V | T | 无向边 | 平均度 | 度域 | 孤立点 |
+| --- | --- | --- | --- | --- | --- | --- |
+| PEMS08（参照） | 170 | 17,856 | 274 | 3.22 | [1, 9] | 0 |
+| PEMS04 | 307 | 16,992 | 340 | 2.21 | [1, 7] | 0 |
+| PEMS03 | 358 | 26,208 | 546 | 3.05 | [1, 6] | 0 |
+
+split 与 PEMS08 一致的 6:2:2（`train.py` 的 `default_config` 新增两个分支）。三者训练集的
+mean/std 也在同一区间（181~230 / 144~156）。
+
+`--is_test` 冒烟测试两个数据集均端到端通过（训练 → 存 → 载入 best → `ddpm`-200 测试 →
+CRPS/MIS → 写 CSV，exit=0）。**注意 2-epoch 冒烟的 MAE 现在是 ~3000 而不是历史记录里的 345**：
+那是 C2 换协议造成的，同条件下 PEMS08 也是 2702，不是数据问题。
+
+### 实测成本（本机 4090）
+
+`ugnet.py:55` 的 `einsum("knm,bitm->bitkn", Lk, x)` 是稠密邻接乘法、`O(V²)`，但 batch 8 的
+训练路径在 V≤358 时 GPU 没吃满，耗时几乎不随 V 变；采样路径（val batch 64、test 8×8=64）
+一吃满 `V²` 就现形。所以成本主要由**采样**决定：
+
+| | 训练 B=8 | 采样 B=64 | 显存峰值 | 训练/seed | test/seed | 3 seeds 合计 |
+| --- | --- | --- | --- | --- | --- | --- |
+| PEMS08 | 1.00× | 1.00× | 0.92 GB | 9.0 h *(实测)* | 1.4 h *(实测)* | 22.9 h *(实测)* |
+| PEMS04 | 1.01× | 2.06× | 1.65 GB | ~14 h | ~2.7 h | **~44 h** |
+| PEMS03 | 0.98× | 2.45× | 1.92 GB | ~18 h | ~5.0 h | **~61 h** |
+| PEMS07 | 1.79× | 7.41× | 4.73 GB | ~48 h | ~16 h | 超单 seed 墙钟上限，不跑 |
+
+建议先跑 PEMS04（便宜 17 h，且是和 PEMS08 配对出现频率最高的一个），提交结果后再开 PEMS03。
+
+
 # 3-seed 复现
 
 ## 启动

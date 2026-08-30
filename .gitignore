@@ -67,3 +67,14 @@ cache.db
 # merge/rebase leftovers
 *.orig
 *.rej
+
+# Datasets are not tracked. PEMS03/04/08 are the standard STSGCN benchmark
+# release and are freely available; see reproduction_note.md for what to fetch
+# and scripts/convert_pems.py for the conversion. PEMS08's two files predate
+# this rule (they came with the upstream repo, commit b723e1e, already on
+# origin/main) and stay tracked -- untracking them would rewrite shared history
+# for a 70 MB saving that only affects fresh clones.
+data/dataset/*/flow.npy
+data/dataset/*/adj.npy
+!data/dataset/PEMS08/flow.npy
+!data/dataset/PEMS08/adj.npy
