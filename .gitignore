@@ -35,6 +35,11 @@ output/log/*
 output/log/run_3seeds_*.log
 # smoke-test logs (--is_test, 2 epochs); the run they belong to is not a result
 output/log/test_*.log
+# train.py copies every finished run's log to a second name carrying the MAE
+# (train.py:606 -- upstream's os.rename is commented out, so it is a copy, not a
+# move). Byte-identical to the .log beside it and referenced by nothing: the CSV
+# and last_run.json both point at the original. Handy for `ls`, useless in git.
+output/log/*.mae*.log
 output/metrics/*
 !output/metrics/*.csv
 
