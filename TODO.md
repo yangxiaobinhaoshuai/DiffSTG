@@ -3,37 +3,34 @@
 大步骤和训练进度看 [PROGRESS.md](PROGRESS.md)；改动理由和实验记录看
 [reproduction_note.md](reproduction_note.md)。这里只放细碎环节。
 
-## 下一步：PEMS04 三 seed（~44 h）
+## 下一步：PEMS03 三 seed（~61 h）
 
-先跑 PEMS04 —— 比 PEMS03 便宜 17 h，且是文献里和 PEMS08 配对出现频率最高的。
-`train.py` 现在 test 阶段直接跑 `ddpm`-200，**跑完就是可报告的数字，不用再补测**。
+最后一个数据集。`train.py` 的 test 阶段直接跑 `ddpm`-200，**跑完就是可报告的数字，不用补测**。
 
 ```bash
 cd /root/projects/DiffSTG
-DATASET=PEMS04 NO_SHUTDOWN=1 \
+DATASET=PEMS03 \
   setsid nohup bash scripts/run_3seeds_shutdown.sh \
-  > output/log/run_pems04.out 2>&1 < /dev/null &
+  > output/log/run_pems03.out 2>&1 < /dev/null &
 ```
 
 - [ ] 起跑，确认 `PPID=1` 且 GPU 上来了
-- [ ] 跑完核对 CSV 里三行 `PEMS04` + `ddpm`/200，算 mean±std
+- [ ] 跑完核对 CSV 里三行 `PEMS03` + `ddpm`/200，算 mean±std
 - [ ] 更新 `PROGRESS.md` 的进度表和结果表
 
 **必须 `setsid`。** 2026-08-30 seed 2024 的补测就是只挂在 tmux 里，shell 一关整个进程被带走，
 日志 0 字节、GPU 空转 7 小时。tmux 不是守护进程。
 
-`NO_SHUTDOWN=1` 是因为跑完还要接着跑 PEMS03；最后一轮再让它自动关机。
-默认 `MAX_HOURS=48`（单 seed 墙钟上限），PEMS04 估算 ~14 h/seed，够。
+这轮**不加 `NO_SHUTDOWN=1`** —— 跑完没有后续实验，让它自动关机（默认 30 min 缓冲，
+`touch output/.cancel_shutdown` 可取消）。默认 `MAX_HOURS=48`（单 seed 墙钟上限），
+PEMS03 估算 ~18 h 训练 + ~5 h test/seed，够。
 
-## 之后：PEMS03 三 seed（~61 h）
-
-同上，`DATASET=PEMS03`。估算 ~18 h/seed，仍在 48 h 上限内。最后一轮可以去掉
-`NO_SHUTDOWN=1` 让它跑完自动关机。
+关机后再开机时记得 `git push`：结果由脚本在 host 上 commit，但从不 push。
 
 ## 收尾
 
 - [ ] 三数据集结果汇总表 -> `PROGRESS.md` + 论文
-- [ ] `git push`（结果在 host 提交，push 手动做）
+- [ ] `git push`（结果在 host 提交，push 手动做；`git status -sb` 看积压几个）
 - [ ] 删 `/root/data_raw/`（48 MB 原始上传件，转换完就没用了）
 - [ ] 开源前：README 补数据获取说明（获取方式已写在 `reproduction_note.md`）
 
