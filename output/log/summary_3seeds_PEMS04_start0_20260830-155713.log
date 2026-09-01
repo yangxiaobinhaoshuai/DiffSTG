@@ -34,3 +34,7 @@ PEMS04,UGnet,200,UGnet,32,12,12,ddpm,200,0.1,8,300,179,0,512,2023,8,0.002,1e-05,
 PEMS04,UGnet,200,UGnet,32,12,12,ddpm,200,0.1,8,300,96,0,512,2024,8,0.002,1e-05,10,False,14:47:47,22.544613,34.95846,15.69462,0.08102269549118846,249.92854,9565.255587361753,/root/projects/DiffSTG/output/model/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2024_bd22b0.dm4stg,/root/projects/DiffSTG/output/log/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2024_bd22b0.log,/root/projects/DiffSTG/output/forecast/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2024_bd22b0.pkl
 
 [INFO] === commit results ===
+[OK] results committed as be943f5 on feature/reproduction
+[INFO] not pushed by design; run `git push` after powering the host back on.
+[INFO] checkpoints and forecast pickles stay on this host (gitignored).
+[INFO] NO_SHUTDOWN=1, host stays up.

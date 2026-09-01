@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "success",
-  "shutdown": "pending",
+  "shutdown": "skipped",
   "exit_status": 0,
   "run_tag": "PEMS04_start0_20260830-155713",
   "dataset": "PEMS04",
@@ -12,7 +12,7 @@
   "started": "2026-08-30T15:57:13+0800",
   "finished": "2026-09-01T14:47:49+0800",
   "code_commit": "913eb34",
-  "results_commit": null,
+  "results_commit": "be943f5",
   "summary_log": "/root/projects/DiffSTG/output/log/summary_3seeds_PEMS04_start0_20260830-155713.log",
   "raw_log": "/root/projects/DiffSTG/output/log/run_3seeds_PEMS04_start0_20260830-155713.log",
   "checkpoints": ["output/model/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2022_3cf0e0.dm4stg", "output/model/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2022_3cf0e0.last.dm4stg", "output/model/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2023_1ba297.dm4stg", "output/model/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2023_1ba297.last.dm4stg", "output/model/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2024_bd22b0.dm4stg", "output/model/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2024_bd22b0.last.dm4stg", "output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2022_6788e0.dm4stg", "output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2022_6788e0.last.dm4stg", "output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2023_13a8c7.dm4stg", "output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2023_13a8c7.last.dm4stg", "output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2024_51bc02.dm4stg", "output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2024_51bc02.last.dm4stg", "output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se20_e300_s2022_f62798.dm4stg", "output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se20_e300_s2022_f62798.last.dm4stg", "output/model/test_PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e2_s2022_fa5c81.dm4stg", "output/model/test_PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e2_s2022_fa5c81.last.dm4stg"]
