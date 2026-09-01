@@ -213,7 +213,7 @@ CSV_HEAD = [
         # evalution setting
         'n_samples',
         # training set
-        'epoch', 'best_epoch', 'start_epoch', 'val_subset', 'seed', 'batch_size', 'lr', 'wd', 'early_stop', 'is_test', 'log_time',
+        'epoch', 'best_epoch', 'start_epoch', 'val_subset', 'rng_restore', 'seed', 'batch_size', 'lr', 'wd', 'early_stop', 'is_test', 'log_time',
         # metric result
         'mae', 'rmse', 'mape', 'crps',  'mis', 'time', 'model_path', 'log_path', 'forecast_path',
 ]

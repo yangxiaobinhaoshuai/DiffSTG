@@ -46,6 +46,8 @@ def get_args():
     p.add_argument("--start_epoch", type=int, default=0)
     p.add_argument("--val_subset", type=int, default=0,
                    help="val_subset the training run used (0 = full split)")
+    p.add_argument("--rng_restore", type=int, default=0, choices=(0, 1),
+                   help="the --rng_restore the training run used; recorded, not acted on")
     p.add_argument("--batch_size", type=int, default=8)
     p.add_argument("--lr", type=float, default=0.002)
     # Test protocol -- defaults match train.py's final evaluation exactly.
@@ -71,6 +73,10 @@ def main():
     config.epoch = args.epoch
     config.start_epoch = args.start_epoch
     config.val_subset = args.val_subset
+    # Recorded for the CSV row only. This script never trains, so restoring the
+    # RNG around evals() would change nothing; the value describes the run that
+    # produced the checkpoint.
+    config.rng_restore = args.rng_restore
     config.n_samples = args.n_samples
     config.test_batch_size = args.test_batch_size
     config.mask_ratio = 0.0

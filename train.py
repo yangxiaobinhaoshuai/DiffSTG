@@ -25,6 +25,9 @@ def make_trial_name(params):
 
     gpu and nni are excluded from the digest: they change where a run happens,
     not what it computes, and must not split one config across two file names.
+    rng_restore is excluded too, but for the opposite reason: it goes in `core`
+    as a visible '_rngfix', so runs are already distinguishable, and leaving it
+    out of the digest keeps every pre-2026-09-01 file name byte-identical.
     """
     import hashlib
     core = (
@@ -32,9 +35,11 @@ def make_trial_name(params):
         f"_N{params['N']}_ss{params['sample_steps']}_h{params['hidden_size']}"
         f"_bs{params['batch_size']}_lr{params['lr']}"
         f"_se{params['start_epoch']}_e{params['epoch']}_s{params['seed']}"
+        f"{'_rngfix' if params.get('rng_restore') else ''}"
     )
     digest = hashlib.blake2b(
-        repr(sorted((k, v) for k, v in params.items() if k not in ('gpu', 'nni'))).encode(),
+        repr(sorted((k, v) for k, v in params.items()
+                    if k not in ('gpu', 'nni', 'rng_restore'))).encode(),
         digest_size=3,
     ).hexdigest()
     prefix = 'test_' if params['is_test'] else ''
@@ -116,6 +121,15 @@ def get_params():
              "instead of the full split (0 = full split). Validation still runs "
              "every epoch, so scheduler patience, early stopping and the per-epoch "
              "setup_seed() reset keep their original meaning",
+    )
+    parser.add_argument(
+        "--rng_restore",
+        type=int,
+        default=0,
+        choices=(0, 1),
+        help="1 restores the RNG state around each validation pass, so training "
+             "draws a fresh batch order, t and noise every epoch. 0 (default) is "
+             "the published behaviour, which replays one frozen epoch",
     )
     # keep --seed last: config.trial_name joins params in declaration order, so the
     # seed stays the trailing component of every log/checkpoint/forecast filename
@@ -239,6 +253,22 @@ def default_config(data='AIR_BJ', gpu_id=None):
     return config
 
 def evals(model, data_loader, epoch, metric, config, clean_data, mode='Test'):
+    # This setup_seed() is upstream's, and it resets the *global* CPU and CUDA
+    # RNGs. Validation runs every epoch, so with nothing restoring the state
+    # afterwards, every training epoch from the first validation on replays the
+    # same shuffle order, the same diffusion steps t and the same noise eps --
+    # each training window keeps one frozen (t, eps) for the whole run instead of
+    # a fresh draw per epoch (reproduction_note.md, 2026-09-01).
+    #
+    # --rng_restore 1 puts the training stream back where it was. The reseed
+    # itself stays: fixed validation noise is what makes the per-epoch val curve
+    # comparable, and model selection depends on that. Default is 0, so the
+    # published behaviour -- the one every result so far was produced under --
+    # is unchanged unless asked for.
+    rng_restore = config.get('rng_restore', 0)
+    if rng_restore:
+        rng_state_cpu = torch.get_rng_state()
+        rng_state_cuda = torch.cuda.get_rng_state_all()
     setup_seed(config.seed)
 
     y_pred, y_true, time_lst = [], [], []
@@ -332,6 +362,9 @@ def evals(model, data_loader, epoch, metric, config, clean_data, mode='Test'):
     config.logger.write_message_buffer()
 
     torch.cuda.empty_cache()
+    if rng_restore:
+        torch.set_rng_state(rng_state_cpu)
+        torch.cuda.set_rng_state_all(rng_state_cuda)
     return metric
 
 
@@ -351,6 +384,7 @@ def main(params: dict):
     config.epoch = params['epoch']
     config.test_batch_size = params['test_batch_size']
     config.val_subset = params['val_subset']
+    config.rng_restore = params['rng_restore']
 
     # model
     config.model.N = params['N']

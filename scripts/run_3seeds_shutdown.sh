@@ -8,6 +8,8 @@
 #   VAL_SUBSET=512          per-epoch validation windows, evenly spaced (0 = full split)
 #   GPU=0                   cuda device index
 #   SEEDS="2022 2023 2024"  seeds to run, in order
+#   EXTRA_ARGS=""           extra train.py flags, e.g. "--rng_restore 1"
+#   RUN_LABEL=""            tag folded into the run name, e.g. rngfix
 #   MAX_HOURS=48            per-seed wall clock limit; 0 disables
 #   SKIP_SMOKE=0            1 skips the --is_test end-to-end check
 #   COMMIT_RESULTS=1        0 skips the host-local git commit of output/
@@ -30,10 +32,15 @@ shutdown_grace_minutes="${SHUTDOWN_GRACE_MINUTES:-30}"
 [[ "$max_hours" == "0" ]] && max_hours=8760
 read -r -a seeds <<< "${SEEDS:-2022 2023 2024}"
 read -r -a py_runner <<< "${PY_RUNNER:-uv run --frozen --no-sync python}"
+# Passed to train.py verbatim, in the smoke test as well as the real seeds, so an
+# ablation flag is exercised end-to-end before hours go into it. RUN_LABEL only
+# names the run's logs and state; the per-trial file names come from train.py.
+read -r -a extra_args <<< "${EXTRA_ARGS:-}"
+run_label="${RUN_LABEL:-}"
 
 csv="output/metrics/DiffSTG.csv"
 run_stamp="$(date +%Y%m%d-%H%M%S)"
-run_tag="${dataset}_start${start_epoch}_${run_stamp}"
+run_tag="${dataset}_start${start_epoch}${run_label:+_${run_label}}_${run_stamp}"
 # run_log is the raw transcript (gitignored: train.py's \r progress makes it one
 # huge line). summary_log holds only the lines below and is tracked by git.
 run_log="output/log/run_3seeds_${run_tag}.log"
@@ -90,6 +97,8 @@ write_state() {
     printf '  "dataset": %s,\n' "$(json_str "$dataset")"
     printf '  "start_epoch": %s,\n' "$start_epoch"
     printf '  "val_subset": %s,\n' "$val_subset"
+    printf '  "extra_args": %s,\n' "$(json_str "${EXTRA_ARGS:-}")"
+    printf '  "label": %s,\n' "$(json_str "$run_label")"
     printf '  "seeds": %s,\n' "$(json_arr "${seeds[@]}")"
     printf '  "failed_seeds": %s,\n' "$(json_arr ${failed[@]+"${failed[@]}"})"
     printf '  "started": %s,\n' "$(json_str "$started_at")"
@@ -120,6 +129,7 @@ run_with_timeout() {
 say '[INFO] dataset=%s start_epoch=%s val_subset=%s gpu=%s max_hours=%s\n' \
   "$dataset" "$start_epoch" "$val_subset" "$gpu" "$max_hours"
 say '[INFO] seeds=%s\n' "${seeds[*]}"
+say '[INFO] extra_args=%s\n' "${EXTRA_ARGS:-<none>}"
 say '[INFO] runner=%s\n' "${py_runner[*]}"
 say '[INFO] commit=%s\n' "$(git rev-parse --short HEAD 2>/dev/null || echo 'not a git repo')"
 say '[INFO] raw_log=%s\n' "$run_log"
@@ -182,7 +192,8 @@ else
     say '\n[INFO] === smoke test (--is_test) ===\n'
     if run_with_timeout 1 "${py_runner[@]}" train.py \
       --data "$dataset" --gpu "$gpu" \
-      --is_test --start_epoch 0 --epoch 2 --val_subset "$val_subset" --seed "${seeds[0]}"; then
+      --is_test --start_epoch 0 --epoch 2 --val_subset "$val_subset" --seed "${seeds[0]}" \
+      ${extra_args[@]+"${extra_args[@]}"}; then
       say '[OK] smoke test passed at %s\n' "$(now)"
     else
       say '[FAIL] smoke test failed (status %s); skipping the real run.\n' "$?"
@@ -207,7 +218,8 @@ if (( run_status == 0 )); then
       --gpu "$gpu" \
       --start_epoch "$start_epoch" \
       --val_subset "$val_subset" \
-      --seed "$seed"
+      --seed "$seed" \
+      ${extra_args[@]+"${extra_args[@]}"}
     seed_status=$?
 
     elapsed=$((SECONDS - seed_start))
