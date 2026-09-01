@@ -3,26 +3,29 @@
 大步骤和训练进度看 [PROGRESS.md](PROGRESS.md)；改动理由和实验记录看
 [reproduction_note.md](reproduction_note.md)。这里只放细碎环节。
 
-## 在跑：RNG 对照（PEMS08 单 seed，~10.5 h）
+## 下一步：定 RNG 规则（挡住 PEMS03）
 
-2026-09-01 15:48 起跑，`PEMS08_start0_rngfix_20260901-154802`，PID 483402（`PPID=1`）。
-**PEMS03 等它跑完再排队**，别抢卡。
+RNG 对照跑完了：单 seed 2022，`--rng_restore 1` 比原版好 **0.33 MAE**（17.57 vs 17.90），
+五个指标全好，收敛快一倍多（best_epoch 78 vs 173，5:35 vs 8:59）。详见
+`reproduction_note.md` 的「2026-09-01 RNG 对照实验」。
+
+n=1，约 2.1σ，不够定论。**建议先补 PEMS08 的另外两个 seed**（各约 5.6 h，合计 ~11 h），
+把它变成 n=3 再决定 baseline 用哪个规则：
 
 ```bash
-# 状态：成/败都在这两个文件里
-cat output/last_run.json
-tail -20 output/log/summary_3seeds_PEMS08_start0_rngfix_20260901-154802.log
-# 曲线
-tail -c 2000 output/log/PEMS08_*rngfix*.log | tr '\r' '\n' | tail -5
+cd /root/projects/DiffSTG
+DATASET=PEMS08 SEEDS="2023 2024" NO_SHUTDOWN=1 \
+  EXTRA_ARGS="--rng_restore 1" RUN_LABEL=rngfix \
+  setsid nohup bash scripts/run_3seeds_shutdown.sh \
+  > output/log/run_pems08_rngfix_b.out 2>&1 < /dev/null &
 ```
 
-- [ ] 跑完对比 CSV 里 `rng_restore=1` 那行 vs seed 2022 的 17.90，把差值填进
-      `reproduction_note.md` 的「2026-09-01 RNG 对照实验」
-- [ ] **失败也要填**（连 `last_run.json` 的 `status` 一起），别留个"进行中"在那
-- [ ] 删掉 CSV 里这轮的冒烟行（`is_test=True`）
-- [ ] 按结果决定：差距小 → 现有 baseline 照用；差距大 → 讨论是否连 baseline 一起重跑
+- [ ] 补 seed 2023/2024，算修正版的 mean±std
+- [ ] 定规则：原版（0 成本，limitation 里写明 0.33）还是修正版（PEMS08+PEMS04 重跑，
+      按收敛加快估约 40 h）
+- [ ] 定了之后 PEMS03 才开跑 —— 规则没定就跑，可能整轮作废
 
-## 之后：PEMS03 三 seed（~61 h）
+## 之后：PEMS03 三 seed（~61 h，原版规则下的估算）
 
 最后一个数据集。`train.py` 的 test 阶段直接跑 `ddpm`-200，**跑完就是可报告的数字，不用补测**。
 
