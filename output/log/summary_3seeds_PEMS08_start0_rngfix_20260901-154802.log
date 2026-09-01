@@ -27,3 +27,7 @@ PEMS08,UGnet,200,UGnet,32,12,12,ddpm,200,0.1,8,2,0,0,512,1,2022,8,0.002,1e-05,10
 PEMS08,UGnet,200,UGnet,32,12,12,ddpm,200,0.1,8,300,78,0,512,1,2022,8,0.002,1e-05,10,False,21:24:4,17.56611,26.81023,11.219389,0.05989786198264674,208.33084,5058.553324788809,/root/projects/DiffSTG/output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2022_rngfix_6788e0.dm4stg,/root/projects/DiffSTG/output/log/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2022_rngfix_6788e0.log,/root/projects/DiffSTG/output/forecast/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2022_rngfix_6788e0.pkl
 
 [INFO] === commit results ===
+[OK] results committed as cdb6c3c on feature/reproduction
+[INFO] not pushed by design; run `git push` after powering the host back on.
+[INFO] checkpoints and forecast pickles stay on this host (gitignored).
+[INFO] NO_SHUTDOWN=1, host stays up.
