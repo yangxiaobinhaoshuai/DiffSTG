@@ -137,6 +137,9 @@ val MAE 带一个 ≤0.2 的固定偏移，**不能与全量验证的历史日�
   「2026-08-29 发布代码的 test 采样器不是原文协议」。改了之后跑完就是可报告的数字，
   不必再用 `scripts/test_from_checkpoint.py` 逐个补测。`sample_steps` 对 `ddpm` 路径是
   装饰性的（`p_sample_loop` 恒定循环 `self.N` 步），填 200 只为让 CSV 行如实反映协议。
+- 新增 `--rng_restore`（默认 0，即保持原版行为）：1 表示在验证前后存档-恢复 RNG 状态。
+  理由见下一节。默认值不动，是因为**已产出的全部结果都在原版行为下测的**，改默认会让
+  baseline 和后续实验不可比。
 - **修 bug**：`evals()` 的 `mode == 'test'` 分支里，写 forecast pickle 前对切片补
   `.clone()`。`torch.cat(samples, dim=0)[:50]` 返回的是**视图**，pickle 会连同底下整个
   storage（全部 3549 个窗口）一起序列化：逻辑数据 9.0 MB，落盘 522.1 MB（samples 463 MB
@@ -145,6 +148,58 @@ val MAE 带一个 ≤0.2 的固定偏移，**不能与全量验证的历史日�
   `contiguous()` 会原样返回同一个视图。修后单个 pickle 约 9 MB。
 
 
+
+## 验证会冻结训练 RNG（原版自带，2026-09-01 定位）
+
+`evals()` 第一行是上游的 `setup_seed(...)`，它重置**全局 CPU RNG 和全部 CUDA RNG**
+（`train.py:44`）。验证每个 epoch 都跑，而且验证的 RNG 消耗是定量的（固定 512 窗口 /
+batch 64 = 8 批 × 200 步），没有任何东西把状态恢复回去。于是**每个 epoch 开始时的 RNG
+状态完全相同**，被冻住的有三样：
+
+- `train_loader` 的 shuffle 种子（`DataLoader(shuffle=True)` 建迭代器时从全局 CPU RNG 取）
+- `DiffSTG.loss()` 的扩散步 `t = torch.randint(..., device=cuda)`
+- 同一行的噪声 `eps = torch.randn_like(x0)`（也在 cuda 上）
+
+实测（用真的 `setup_seed` + 同构的 loader/抽样序列复现，`--rng_restore` 两种取值各跑一遍）：
+
+| epoch | 前 4 个 shuffle 下标 | batch 0 的 t | sum(ε) |
+| --- | --- | --- | --- |
+| 0 | 472, 392, 204, 350 | 103, 60, 182, 131 | +255.7652 |
+| 1 | 710, 419, 305, 303 | 40, 67, 105, 52 | +41.1219 |
+| 2 | 710, 419, 305, 303 | 40, 67, 105, 52 | +41.1219 |
+| 3 | 710, 419, 305, 303 | 40, 67, 105, 52 | +41.1219 |
+
+即**从 epoch 1 起，每个 epoch 都是同一次训练的逐字重放**。epoch 0 不同，是因为它用的是
+`main()` 里那次 `setup_seed` 之后、被建模型等操作推进过的状态。加 `--rng_restore 1` 后
+epoch 1/2/3 各不相同。
+
+**为什么这重要**：DDPM 的训练目标是 `E_{t,ε}[‖ε − ε_θ‖²]`，靠"每次见到样本都重抽 (t, ε)"
+来估这个期望。现在每个训练窗口在整个训练里**只配到一个固定的 (t, ε)**。PEMS08 约 1.07 万个
+窗口，于是训练集实际是 1.07 万个**冻结三元组** `(x0, t, ε)` 被重复看上百遍，而不是每
+epoch 新抽一组。t 的覆盖没问题（每个时间步 ~53 个样本），坏的是每个 `(x0, t)` 只有一个
+噪声实现，模型可以去记它。方向上这对 DiffSTG **不利**，所以已发表数字如果有偏，是偏低。
+
+**这是上游发布代码自带的**：`b723e1e:train.py:154` 就是 `setup_seed(2022)` —— 而且写死
+2022。意味着原版改 `--seed` 也没用，从 epoch 1 起所有 seed 都被拉回同一条轨迹，
+**原版根本产不出种子方差**。我们的 `--seed` 改动修了这一半（所以我们能报 mean±std），
+`--rng_restore` 针对另一半。
+
+**修法不是删掉那行重置**。验证噪声每个 epoch 保持一致是好性质：val 曲线不含采样噪声，
+early stop 和 `ReduceLROnPlateau` 才是在比模型而不是在比运气。错的是**没有恢复**，所以
+`--rng_restore 1` 的做法是验证前存档、验证后恢复，重置照旧：
+
+```python
+rng_state_cpu, rng_state_cuda = torch.get_rng_state(), torch.cuda.get_rng_state_all()
+setup_seed(config.seed)   # 验证仍用固定噪声
+...
+torch.set_rng_state(rng_state_cpu); torch.cuda.set_rng_state_all(rng_state_cuda)
+```
+
+**默认保持 0**。已完成的 PEMS08/PEMS04 全部在原版行为下产出，它们是 baseline；要改就得
+两边一起改，否则就是"自己的方法修了、baseline 没修"的不对称。文件名上冻结版不带标记、
+`--rng_restore 1` 带 `_rngfix`，摘要位不变（已对着已提交的 PEMS08 seed 2022 checkpoint
+断言过），所以历史文件名一个都没动。CSV 新增 `rng_restore` 列，老行手工回填 0（它们确实
+是 0，不是未知，所以没走 `save2file_meta` 的 -1）。
 
 ## 新增数据集：PEMS03 / PEMS04（原文没有）
 
@@ -628,3 +683,29 @@ seed 2024 训练耗时短是因为 best_epoch 只到 91，早停触发得早。
 `output/model/*.dm4stg` 进了 git，但 `run_3seeds_shutdown.sh` 的 `git add` 列表没跟着改。
 本轮因为 `NO_SHUTDOWN=1` 才有机会补救；若按默认自动关机，checkpoint 就只留在 host 上了。
 脚本已修（见「脚本为什么这么写 / 关机前 commit」）。
+
+## 2026-09-01 RNG 对照实验（进行中）
+
+量化上一节那个原版行为值多少 MAE。**单变量对照**：除 `--rng_restore 1` 外，全部与已完成的
+PEMS08 seed 2022 一致（`START_EPOCH=0` `VAL_SUBSET=512`、同一 `default_config`、同一
+`ddpm`-200 测试协议）。
+
+| | |
+| --- | --- |
+| run_tag | `PEMS08_start0_rngfix_20260901-154802` |
+| 命令 | `DATASET=PEMS08 SEEDS=2022 NO_SHUTDOWN=1 EXTRA_ARGS="--rng_restore 1" RUN_LABEL=rngfix` |
+| code commit | `c4416f0` |
+| 起跑 | 2026-09-01 15:48（冒烟 15:48:45 通过） |
+| 预计 | 训练 ~9 h + `ddpm`-200 全量 test ~1.4 h ≈ 10.5 h |
+| 对照组 | `PEMS08_..._s2022_6788e0`，MAE **17.90**、best_epoch 173 |
+| 状态 | **进行中** |
+
+结果出来后填这里。三种可能都要如实记：
+
+- **差距小（≲0.2 MAE）** —— 现有 baseline 数字照用，论文里写明这条实现细节及其量级。
+- **差距大（≳0.5 MAE）** —— 现有 PEMS08/PEMS04 baseline 偏低，得决定是否连 baseline 一起
+  重跑（约 70 h，且 PEMS08 会漂离原文 17.68 那个锚点）。
+- **失败/中断** —— 同样记在这里，连 `output/last_run.json` 的 `status` 一起，别留空白。
+
+单 seed 的结论强度有限：PEMS08 在正确协议下的种子 sd 是 0.11 MAE，所以只有超过约 0.3 的
+差距才能和种子噪声区分开。这一轮是**定量级，不是定论**。

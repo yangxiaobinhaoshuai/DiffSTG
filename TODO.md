@@ -3,7 +3,26 @@
 大步骤和训练进度看 [PROGRESS.md](PROGRESS.md)；改动理由和实验记录看
 [reproduction_note.md](reproduction_note.md)。这里只放细碎环节。
 
-## 下一步：PEMS03 三 seed（~61 h）
+## 在跑：RNG 对照（PEMS08 单 seed，~10.5 h）
+
+2026-09-01 15:48 起跑，`PEMS08_start0_rngfix_20260901-154802`，PID 483402（`PPID=1`）。
+**PEMS03 等它跑完再排队**，别抢卡。
+
+```bash
+# 状态：成/败都在这两个文件里
+cat output/last_run.json
+tail -20 output/log/summary_3seeds_PEMS08_start0_rngfix_20260901-154802.log
+# 曲线
+tail -c 2000 output/log/PEMS08_*rngfix*.log | tr '\r' '\n' | tail -5
+```
+
+- [ ] 跑完对比 CSV 里 `rng_restore=1` 那行 vs seed 2022 的 17.90，把差值填进
+      `reproduction_note.md` 的「2026-09-01 RNG 对照实验」
+- [ ] **失败也要填**（连 `last_run.json` 的 `status` 一起），别留个"进行中"在那
+- [ ] 删掉 CSV 里这轮的冒烟行（`is_test=True`）
+- [ ] 按结果决定：差距小 → 现有 baseline 照用；差距大 → 讨论是否连 baseline 一起重跑
+
+## 之后：PEMS03 三 seed（~61 h）
 
 最后一个数据集。`train.py` 的 test 阶段直接跑 `ddpm`-200，**跑完就是可报告的数字，不用补测**。
 
