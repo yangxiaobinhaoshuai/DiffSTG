@@ -1,0 +1,29 @@
+[INFO] dataset=PEMS08 start_epoch=0 val_subset=512 gpu=0 max_hours=48
+[INFO] seeds=2022
+[INFO] extra_args=--rng_restore 1
+[INFO] runner=uv run --frozen --no-sync python
+[INFO] commit=c4416f0
+[INFO] raw_log=output/log/run_3seeds_PEMS08_start0_rngfix_20260901-154802.log
+[INFO] started at 2026-09-01T15:48:02+0800
+
+[INFO] === preflight ===
+[OK] data/dataset/PEMS08/flow.npy
+[OK] data/dataset/PEMS08/adj.npy
+[OK] timeout=/usr/bin/timeout
+
+[INFO] === smoke test (--is_test) ===
+[OK] smoke test passed at 2026-09-01T15:48:45+0800
+
+[INFO] === seeds ===
+
+[INFO] seed=2022 started at 2026-09-01T15:48:45+0800
+[OK] seed=2022 done at 2026-09-01T21:24:05+0800, elapsed=05:35:20
+
+[INFO] === summary ===
+[INFO] finished at 2026-09-01T21:24:05+0800, total elapsed=05:36:03
+[OK] all seeds completed: 2022
+[INFO] last rows of output/metrics/DiffSTG.csv:
+PEMS08,UGnet,200,UGnet,32,12,12,ddpm,200,0.1,8,2,0,0,512,1,2022,8,0.002,1e-05,10,True,15:48:43,2702.3806,3234.2742,1254.2434,3.5395435534025492,10370.661,10.71179100126028,/root/projects/DiffSTG/output/model/test_PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e2_s2022_rngfix_bbaae7.dm4stg,/root/projects/DiffSTG/output/log/test_PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e2_s2022_rngfix_bbaae7.log,/root/projects/DiffSTG/output/forecast/test_PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e2_s2022_rngfix_bbaae7.pkl
+PEMS08,UGnet,200,UGnet,32,12,12,ddpm,200,0.1,8,300,78,0,512,1,2022,8,0.002,1e-05,10,False,21:24:4,17.56611,26.81023,11.219389,0.05989786198264674,208.33084,5058.553324788809,/root/projects/DiffSTG/output/model/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2022_rngfix_6788e0.dm4stg,/root/projects/DiffSTG/output/log/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2022_rngfix_6788e0.log,/root/projects/DiffSTG/output/forecast/PEMS08_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2022_rngfix_6788e0.pkl
+
+[INFO] === commit results ===
