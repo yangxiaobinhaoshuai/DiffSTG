@@ -1,0 +1,444 @@
+{'PATH_MOD': '/root/projects/DiffSTG/output/model/', 'PATH_LOG': '/root/projects/DiffSTG/output/log/', 'PATH_FORECAST': '/root/projects/DiffSTG/output/forecast/', 'data': {'name': 'PEMS04', 'path': '/root/projects/DiffSTG/data/dataset/', 'feature_file': '/root/projects/DiffSTG/data/dataset/PEMS04/flow.npy', 'spatial': '/root/projects/DiffSTG/data/dataset/PEMS04/adj.npy', 'num_recent': 1, 'num_features': 1, 'num_vertices': 307, 'points_per_hour': 12, 'val_start_idx': 10195, 'test_start_idx': 13593}, 'gpu_id': 0, 'model': {'T_p': 12, 'T_h': 12, 'V': 307, 'F': 1, 'week_len': 7, 'day_len': 288, 'device': device(type='cuda', index=0), 'd_h': 32, 'N': 200, 'sample_steps': 200, 'epsilon_theta': 'UGnet', 'is_label_condition': True, 'beta_end': 0.1, 'beta_schedule': 'quad', 'sample_strategy': 'ddpm', 'channel_multipliers': [1, 2], 'supports_len': 2, 'C': 32, 'n_channels': 32}, 'n_samples': 8, 'model_name': 'DiffSTG', 'is_test': False, 'epoch': 300, 'optimizer': 'adam', 'lr': 0.002, 'batch_size': 8, 'wd': 1e-05, 'early_stop': 10, 'start_epoch': 0, 'device': device(type='cuda', index=0), 'logger': <utils.common_utils.Logger object at 0x7fe3653300d0>, 'nni': False, 'mask_ratio': 0.0, 'seed': 2023, 'test_batch_size': 8, 'val_subset': 512, 'T_h': 12, 'T_p': 12, 'trial_name': 'PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2023_1ba297', 'log_path': '/root/projects/DiffSTG/output/log/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2023_1ba297.log'}
+model path:/root/projects/DiffSTG/output/model/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2023_1ba297.dm4stg
+forecast_path:/root/projects/DiffSTG/output/model/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2023_1ba297.dm4stg
+DiffSTG(
+  (eps_model): UGnet(
+    (down): ModuleList(
+      (0-1): 2 x DownBlock(
+        (res): ResidualBlock(
+          (tcn1): TcnBlock(
+            (conv): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+            (chomp): Chomp()
+            (drop): Dropout(p=0.0, inplace=False)
+            (net): Sequential(
+              (0): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+              (1): Chomp()
+              (2): Dropout(p=0.0, inplace=False)
+            )
+          )
+          (tcn2): TcnBlock(
+            (conv): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+            (chomp): Chomp()
+            (drop): Dropout(p=0.0, inplace=False)
+            (net): Sequential(
+              (0): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+              (1): Chomp()
+              (2): Dropout(p=0.0, inplace=False)
+            )
+          )
+          (shortcut): Identity()
+          (t_conv): Conv2d(32, 32, kernel_size=(1, 1), stride=(1, 1))
+          (spatial): SpatialBlock()
+          (norm): LayerNorm((307, 32), eps=1e-05, elementwise_affine=True)
+        )
+      )
+      (2): Downsample(
+        (conv): Conv2d(32, 32, kernel_size=(1, 3), stride=(1, 2), padding=(0, 1))
+      )
+      (3): DownBlock(
+        (res): ResidualBlock(
+          (tcn1): TcnBlock(
+            (conv): Conv2d(32, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+            (chomp): Chomp()
+            (drop): Dropout(p=0.0, inplace=False)
+            (net): Sequential(
+              (0): Conv2d(32, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+              (1): Chomp()
+              (2): Dropout(p=0.0, inplace=False)
+            )
+            (shortcut): Conv2d(32, 64, kernel_size=(1, 1), stride=(1, 1))
+          )
+          (tcn2): TcnBlock(
+            (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+            (chomp): Chomp()
+            (drop): Dropout(p=0.0, inplace=False)
+            (net): Sequential(
+              (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+              (1): Chomp()
+              (2): Dropout(p=0.0, inplace=False)
+            )
+          )
+          (shortcut): Conv2d(32, 64, kernel_size=(1, 1), stride=(1, 1))
+          (t_conv): Conv2d(32, 64, kernel_size=(1, 1), stride=(1, 1))
+          (spatial): SpatialBlock()
+          (norm): LayerNorm((307, 64), eps=1e-05, elementwise_affine=True)
+        )
+      )
+      (4): DownBlock(
+        (res): ResidualBlock(
+          (tcn1): TcnBlock(
+            (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+            (chomp): Chomp()
+            (drop): Dropout(p=0.0, inplace=False)
+            (net): Sequential(
+              (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+              (1): Chomp()
+              (2): Dropout(p=0.0, inplace=False)
+            )
+          )
+          (tcn2): TcnBlock(
+            (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+            (chomp): Chomp()
+            (drop): Dropout(p=0.0, inplace=False)
+            (net): Sequential(
+              (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+              (1): Chomp()
+              (2): Dropout(p=0.0, inplace=False)
+            )
+          )
+          (shortcut): Identity()
+          (t_conv): Conv2d(32, 64, kernel_size=(1, 1), stride=(1, 1))
+          (spatial): SpatialBlock()
+          (norm): LayerNorm((307, 64), eps=1e-05, elementwise_affine=True)
+        )
+      )
+    )
+    (middle): MiddleBlock(
+      (res1): ResidualBlock(
+        (tcn1): TcnBlock(
+          (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+          (chomp): Chomp()
+          (drop): Dropout(p=0.0, inplace=False)
+          (net): Sequential(
+            (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+            (1): Chomp()
+            (2): Dropout(p=0.0, inplace=False)
+          )
+        )
+        (tcn2): TcnBlock(
+          (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+          (chomp): Chomp()
+          (drop): Dropout(p=0.0, inplace=False)
+          (net): Sequential(
+            (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+            (1): Chomp()
+            (2): Dropout(p=0.0, inplace=False)
+          )
+        )
+        (shortcut): Identity()
+        (t_conv): Conv2d(32, 64, kernel_size=(1, 1), stride=(1, 1))
+        (spatial): SpatialBlock()
+        (norm): LayerNorm((307, 64), eps=1e-05, elementwise_affine=True)
+      )
+      (res2): ResidualBlock(
+        (tcn1): TcnBlock(
+          (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+          (chomp): Chomp()
+          (drop): Dropout(p=0.0, inplace=False)
+          (net): Sequential(
+            (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+            (1): Chomp()
+            (2): Dropout(p=0.0, inplace=False)
+          )
+        )
+        (tcn2): TcnBlock(
+          (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+          (chomp): Chomp()
+          (drop): Dropout(p=0.0, inplace=False)
+          (net): Sequential(
+            (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+            (1): Chomp()
+            (2): Dropout(p=0.0, inplace=False)
+          )
+        )
+        (shortcut): Identity()
+        (t_conv): Conv2d(32, 64, kernel_size=(1, 1), stride=(1, 1))
+        (spatial): SpatialBlock()
+        (norm): LayerNorm((307, 64), eps=1e-05, elementwise_affine=True)
+      )
+    )
+    (up): ModuleList(
+      (0-1): 2 x UpBlock(
+        (res): ResidualBlock(
+          (tcn1): TcnBlock(
+            (conv): Conv2d(128, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+            (chomp): Chomp()
+            (drop): Dropout(p=0.0, inplace=False)
+            (net): Sequential(
+              (0): Conv2d(128, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+              (1): Chomp()
+              (2): Dropout(p=0.0, inplace=False)
+            )
+            (shortcut): Conv2d(128, 64, kernel_size=(1, 1), stride=(1, 1))
+          )
+          (tcn2): TcnBlock(
+            (conv): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+            (chomp): Chomp()
+            (drop): Dropout(p=0.0, inplace=False)
+            (net): Sequential(
+              (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+              (1): Chomp()
+              (2): Dropout(p=0.0, inplace=False)
+            )
+          )
+          (shortcut): Conv2d(128, 64, kernel_size=(1, 1), stride=(1, 1))
+          (t_conv): Conv2d(32, 64, kernel_size=(1, 1), stride=(1, 1))
+          (spatial): SpatialBlock()
+          (norm): LayerNorm((307, 64), eps=1e-05, elementwise_affine=True)
+        )
+      )
+      (2): UpBlock(
+        (res): ResidualBlock(
+          (tcn1): TcnBlock(
+            (conv): Conv2d(96, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+            (chomp): Chomp()
+            (drop): Dropout(p=0.0, inplace=False)
+            (net): Sequential(
+              (0): Conv2d(96, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+              (1): Chomp()
+              (2): Dropout(p=0.0, inplace=False)
+            )
+            (shortcut): Conv2d(96, 32, kernel_size=(1, 1), stride=(1, 1))
+          )
+          (tcn2): TcnBlock(
+            (conv): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+            (chomp): Chomp()
+            (drop): Dropout(p=0.0, inplace=False)
+            (net): Sequential(
+              (0): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+              (1): Chomp()
+              (2): Dropout(p=0.0, inplace=False)
+            )
+          )
+          (shortcut): Conv2d(96, 32, kernel_size=(1, 1), stride=(1, 1))
+          (t_conv): Conv2d(32, 32, kernel_size=(1, 1), stride=(1, 1))
+          (spatial): SpatialBlock()
+          (norm): LayerNorm((307, 32), eps=1e-05, elementwise_affine=True)
+        )
+      )
+      (3): Upsample(
+        (conv): ConvTranspose2d(32, 32, kernel_size=(1, 4), stride=(1, 2), padding=(0, 1))
+      )
+      (4-6): 3 x UpBlock(
+        (res): ResidualBlock(
+          (tcn1): TcnBlock(
+            (conv): Conv2d(64, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+            (chomp): Chomp()
+            (drop): Dropout(p=0.0, inplace=False)
+            (net): Sequential(
+              (0): Conv2d(64, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+              (1): Chomp()
+              (2): Dropout(p=0.0, inplace=False)
+            )
+            (shortcut): Conv2d(64, 32, kernel_size=(1, 1), stride=(1, 1))
+          )
+          (tcn2): TcnBlock(
+            (conv): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+            (chomp): Chomp()
+            (drop): Dropout(p=0.0, inplace=False)
+            (net): Sequential(
+              (0): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 2))
+              (1): Chomp()
+              (2): Dropout(p=0.0, inplace=False)
+            )
+          )
+          (shortcut): Conv2d(64, 32, kernel_size=(1, 1), stride=(1, 1))
+          (t_conv): Conv2d(32, 32, kernel_size=(1, 1), stride=(1, 1))
+          (spatial): SpatialBlock()
+          (norm): LayerNorm((307, 32), eps=1e-05, elementwise_affine=True)
+        )
+      )
+    )
+    (x_proj): Conv2d(1, 32, kernel_size=(1, 1), stride=(1, 1))
+    (out): Sequential(
+      (0): Conv2d(32, 1, kernel_size=(1, 1), stride=(1, 1))
+      (1): Linear(in_features=48, out_features=24, bias=True)
+    )
+  )
+)Num_of_parameters:1154617
+      |---Train--- |---Val Future-- -|-----Val History----|
+Epoch | Loss  Time | MAE     RMSE    |  MAE    RMSE   Time|
+     0| 1.992 74.2s |[106.72 143.36 ] | 92.37  115.07 184.41s
+     1| 0.879 73.9s |[94.94  130.19 ] | 86.24  111.01 185.60s
+     2| 0.812 73.7s |[89.09  120.89 ] | 72.70  98.58  184.68s
+     3| 0.780 72.8s | 98.31  136.25  | 59.81  77.97  183.77s
+     4| 0.763 73.6s | 91.12  117.29  | 68.70  79.18  184.37s
+     5| 0.737 74.1s | 153.60 182.96  | 88.58  104.24 184.23s
+     6| 0.724 73.2s |[66.80  92.46  ] | 33.48  42.92  184.64s
+     7| 0.719 73.5s | 71.45  96.74   | 44.02  54.96  185.22s
+     8| 0.698 73.4s | 72.68  98.13   | 42.39  56.98  185.79s
+     9| 0.688 72.7s | 69.52  94.24   | 43.72  59.82  185.43s
+    10| 0.681 74.1s | 79.33  106.18  | 93.99  127.39 183.64s
+    11| 0.671 72.7s | 69.36  93.03   | 51.11  63.08  183.78s
+    12| 0.665 73.3s | 69.93  94.08   | 51.76  67.52  184.39s
+    13| 0.631 73.1s | 67.11  92.64   | 24.16  30.44  183.44s
+    14| 0.628 72.0s |[63.85  88.23  ] | 25.95  32.27  183.93s
+    15| 0.625 65.8s | 66.30  92.50   | 19.67  24.80  183.79s
+    16| 0.622 73.9s | 64.78  89.90   | 25.21  30.82  185.16s
+    17| 0.619 71.5s | 67.35  94.48   | 22.76  28.51  184.85s
+    18| 0.617 74.3s | 74.91  103.41  | 18.59  24.98  183.86s
+    19| 0.613 71.8s |[59.34  84.95  ] | 14.83  18.65  185.18s
+    20| 0.612 73.3s | 67.04  95.01   | 12.94  16.81  184.31s
+    21| 0.609 73.4s | 66.13  93.62   | 14.78  19.04  180.76s
+    22| 0.608 72.6s | 81.21  109.96  | 15.86  21.56  177.68s
+    23| 0.605 69.0s | 59.91  85.93   | 12.24  15.89  178.21s
+    24| 0.604 74.8s | 69.19  95.93   | 12.74  17.22  177.24s
+    25| 0.603 75.5s |[58.08  83.58  ] | 10.96  14.47  177.90s
+    26| 0.599 74.4s |[51.50  75.25  ] | 8.07   10.56  177.32s
+    27| 0.598 73.7s |[47.65  68.46  ] | 10.08  12.70  177.40s
+    28| 0.596 67.4s | 50.12  72.70   | 8.36   10.83  177.44s
+    29| 0.595 74.9s | 55.75  81.01   | 8.33   10.86  176.25s
+    30| 0.593 75.9s | 47.95  69.77   | 9.46   11.82  181.53s
+    31| 0.593 74.9s | 67.61  94.96   | 11.74  15.53  179.01s
+    32| 0.590 74.5s | 55.31  80.66   | 7.12   9.35   177.75s
+    33| 0.588 74.2s | 58.26  83.63   | 7.59   10.34  177.67s
+    34| 0.574 70.3s | 49.06  71.90   | 4.71   6.39   176.81s
+    35| 0.571 74.8s | 49.78  72.66   | 4.53   6.21   177.33s
+    36| 0.569 75.1s | 47.97  70.28   | 4.23   5.86   177.47s
+    37| 0.568 73.9s |[43.57  64.51  ] | 3.74   5.13   177.22s
+    38| 0.566 70.0s | 44.48  65.87   | 3.61   4.94   175.76s
+    39| 0.565 74.1s |[42.97  63.75  ] | 3.45   4.68   176.21s
+    40| 0.564 73.5s | 43.67  64.78   | 3.37   4.58   176.06s
+    41| 0.562 70.9s |[42.64  63.32  ] | 3.26   4.44   176.15s
+    42| 0.561 68.6s |[41.13  61.44  ] | 2.92   3.87   176.04s
+    43| 0.560 73.1s | 42.64  63.52   | 2.90   3.91   176.08s
+    44| 0.559 73.9s | 42.62  63.43   | 2.88   3.93   176.09s
+    45| 0.558 72.8s |[40.78  61.09  ] | 2.76   3.69   176.06s
+    46| 0.556 73.3s | 40.80  61.10   | 2.52   3.38   176.05s
+    47| 0.556 73.1s | 41.37  61.92   | 2.64   3.51   177.32s
+    48| 0.554 74.5s | 42.55  63.41   | 2.66   3.61   183.44s
+    49| 0.554 75.0s | 43.40  64.26   | 2.84   3.87   183.96s
+    50| 0.553 76.0s |[39.67  59.48  ] | 2.49   3.36   183.77s
+    51| 0.552 74.8s | 41.75  62.27   | 2.71   3.67   184.06s
+    52| 0.551 75.9s | 40.71  60.91   | 2.74   3.71   184.15s
+    53| 0.550 76.1s |[37.85  56.93  ] | 2.49   3.35   184.33s
+    54| 0.549 74.4s |[36.97  55.70  ] | 2.37   3.16   185.42s
+    55| 0.548 54.3s | 37.62  56.64   | 2.33   3.13   185.15s
+    56| 0.547 71.6s | 39.41  59.32   | 2.33   3.08   185.32s
+    57| 0.546 75.1s | 41.02  61.34   | 2.61   3.53   185.83s
+    58| 0.545 74.3s | 37.07  55.94   | 2.25   3.00   185.82s
+    59| 0.544 75.3s | 37.26  56.16   | 2.26   3.02   185.68s
+    60| 0.543 75.2s | 39.61  59.45   | 2.45   3.28   184.73s
+    61| 0.537 72.7s |[34.52  52.54  ] | 1.82   2.37   183.99s
+    62| 0.535 74.2s | 35.65  54.08   | 1.87   2.44   184.68s
+    63| 0.534 75.4s | 36.32  54.99   | 1.91   2.50   184.80s
+    64| 0.533 75.4s | 36.12  54.68   | 1.84   2.40   184.72s
+    65| 0.531 74.8s | 37.04  55.90   | 1.92   2.51   184.31s
+    66| 0.531 75.8s | 37.74  56.88   | 2.04   2.67   185.11s
+    67| 0.530 68.9s | 37.82  56.85   | 1.95   2.55   185.43s
+    68| 0.528 71.3s |[31.87  48.83  ] | 1.94   2.51   184.64s
+    69| 0.527 75.4s |[31.80  48.78  ] | 1.85   2.38   184.68s
+    70| 0.526 75.6s |[31.60  48.51  ] | 1.80   2.31   184.59s
+    71| 0.525 75.4s |[31.59  48.52  ] | 1.77   2.28   185.87s
+    72| 0.524 72.5s |[31.48  48.39  ] | 1.72   2.22   185.64s
+    73| 0.524 75.0s |[31.48  48.40  ] | 1.71   2.20   185.08s
+    74| 0.523 74.2s |[31.35  48.24  ] | 1.66   2.14   186.04s
+    75| 0.522 74.5s |[31.21  48.01  ] | 1.66   2.13   185.32s
+    76| 0.522 75.0s |[31.08  47.83  ] | 1.65   2.11   185.65s
+    77| 0.521 74.8s | 31.28  48.17   | 1.62   2.07   185.58s
+    78| 0.521 75.3s | 31.12  47.95   | 1.61   2.06   185.36s
+    79| 0.520 56.1s |[30.98  47.69  ] | 1.63   2.08   186.22s
+    80| 0.520 75.2s | 31.15  47.99   | 1.61   2.06   185.39s
+    81| 0.519 74.5s | 30.99  47.76   | 1.60   2.04   184.34s
+    82| 0.519 71.9s |[30.93  47.63  ] | 1.61   2.05   185.30s
+    83| 0.518 75.0s | 31.12  47.91   | 1.62   2.07   185.23s
+    84| 0.518 74.0s | 30.97  47.67   | 1.61   2.06   185.37s
+    85| 0.518 75.2s | 31.16  47.97   | 1.62   2.07   184.88s
+    86| 0.517 74.9s | 31.23  48.10   | 1.61   2.06   185.02s
+    87| 0.517 75.9s | 31.10  47.93   | 1.58   2.02   184.16s
+    88| 0.516 75.5s | 31.16  48.03   | 1.58   2.02   184.39s
+    89| 0.517 71.3s |[30.05  46.31  ] | 1.51   1.92   184.68s
+    90| 0.516 75.2s |[30.02  46.32  ] | 1.51   1.92   184.53s
+    91| 0.516 74.2s |[29.99  46.28  ] | 1.51   1.91   184.91s
+    92| 0.515 73.7s | 30.00  46.31   | 1.50   1.91   182.10s
+    93| 0.515 74.2s |[29.97  46.28  ] | 1.50   1.91   182.65s
+    94| 0.515 68.3s | 29.99  46.32   | 1.50   1.91   183.67s
+    95| 0.514 72.2s |[29.93  46.24  ] | 1.50   1.90   184.19s
+    96| 0.514 74.1s | 29.95  46.29   | 1.50   1.90   183.12s
+    97| 0.514 75.4s |[29.93  46.25  ] | 1.49   1.90   183.18s
+    98| 0.513 73.7s |[29.91  46.23  ] | 1.49   1.89   182.06s
+    99| 0.513 70.9s |[29.90  46.23  ] | 1.49   1.89   179.33s
+   100| 0.513 74.7s | 29.91  46.23   | 1.49   1.89   180.44s
+   101| 0.512 74.3s |[29.90  46.24  ] | 1.49   1.89   179.59s
+   102| 0.512 74.0s |[29.90  46.24  ] | 1.48   1.88   180.40s
+   103| 0.512 74.0s | 29.91  46.26   | 1.48   1.88   180.37s
+   104| 0.512 75.3s |[29.86  46.19  ] | 1.48   1.88   180.30s
+   105| 0.511 75.1s |[29.86  46.20  ] | 1.48   1.88   179.63s
+   106| 0.511 76.1s |[29.86  46.19  ] | 1.48   1.88   180.18s
+   107| 0.511 73.5s | 29.86  46.20   | 1.48   1.87   179.93s
+   108| 0.511 73.3s |[29.81  46.12  ] | 1.48   1.87   179.46s
+   109| 0.510 75.2s | 29.84  46.19   | 1.47   1.87   180.64s
+   110| 0.510 66.5s | 29.88  46.26   | 1.47   1.87   181.99s
+   111| 0.510 72.8s | 29.82  46.15   | 1.47   1.86   182.55s
+   112| 0.510 72.3s | 29.89  46.28   | 1.47   1.87   180.36s
+   113| 0.510 74.3s | 29.86  46.23   | 1.47   1.86   177.39s
+   114| 0.509 74.6s | 29.85  46.21   | 1.47   1.86   178.04s
+   115| 0.511 74.3s |[29.60  45.76  ] | 1.42   1.80   178.77s
+   116| 0.510 65.2s |[29.59  45.75  ] | 1.42   1.79   180.37s
+   117| 0.510 76.0s |[29.57  45.73  ] | 1.42   1.79   179.70s
+   118| 0.510 75.7s |[29.56  45.71  ] | 1.42   1.79   179.89s
+   119| 0.510 73.4s |[29.55  45.69  ] | 1.42   1.79   179.50s
+   120| 0.509 72.9s |[29.55  45.69  ] | 1.41   1.79   179.68s
+   121| 0.509 73.3s |[29.54  45.68  ] | 1.41   1.79   179.48s
+   122| 0.509 73.7s |[29.54  45.68  ] | 1.41   1.78   179.28s
+   123| 0.509 73.1s |[29.54  45.68  ] | 1.41   1.78   180.26s
+   124| 0.509 71.8s |[29.53  45.67  ] | 1.41   1.78   179.08s
+   125| 0.508 69.2s |[29.52  45.66  ] | 1.41   1.78   181.33s
+   126| 0.508 73.4s |[29.52  45.66  ] | 1.41   1.78   181.11s
+   127| 0.508 68.6s | 29.53  45.67   | 1.41   1.78   181.52s
+   128| 0.508 71.9s |[29.51  45.66  ] | 1.41   1.78   179.93s
+   129| 0.508 72.6s | 29.52  45.66   | 1.41   1.78   178.96s
+   130| 0.508 73.9s | 29.52  45.67   | 1.41   1.78   179.23s
+   131| 0.508 73.8s | 29.52  45.66   | 1.41   1.78   179.34s
+   132| 0.507 73.3s |[29.51  45.64  ] | 1.41   1.78   180.30s
+   133| 0.507 73.7s |[29.50  45.64  ] | 1.41   1.78   180.00s
+   134| 0.507 73.4s | 29.51  45.65   | 1.41   1.78   179.74s
+   135| 0.507 73.6s | 29.51  45.64   | 1.41   1.78   179.83s
+   136| 0.507 72.8s | 29.51  45.64   | 1.41   1.77   179.54s
+   137| 0.507 71.2s |[29.49  45.62  ] | 1.41   1.77   179.12s
+   138| 0.507 74.1s | 29.50  45.65   | 1.40   1.77   179.69s
+   139| 0.506 69.7s |[29.49  45.62  ] | 1.40   1.77   180.95s
+   140| 0.506 73.1s | 29.49  45.64   | 1.40   1.77   180.19s
+   141| 0.506 71.8s |[29.48  45.62  ] | 1.40   1.77   180.88s
+   142| 0.506 71.7s |[29.48  45.62  ] | 1.40   1.77   181.56s
+   143| 0.506 73.3s | 29.48  45.62   | 1.40   1.77   181.21s
+   144| 0.506 73.3s | 29.48  45.63   | 1.40   1.77   179.10s
+   145| 0.506 59.7s |[29.47  45.62  ] | 1.40   1.77   179.88s
+   146| 0.506 73.2s | 29.47  45.62   | 1.40   1.77   178.89s
+   147| 0.505 71.5s |[29.47  45.61  ] | 1.40   1.77   179.16s
+   148| 0.505 72.5s |[29.47  45.60  ] | 1.40   1.77   179.53s
+   149| 0.505 73.7s |[29.46  45.61  ] | 1.40   1.77   178.85s
+   150| 0.505 72.7s |[29.46  45.59  ] | 1.40   1.77   179.34s
+   151| 0.505 65.2s | 29.46  45.60   | 1.40   1.77   180.60s
+   152| 0.505 73.2s |[29.46  45.59  ] | 1.40   1.76   181.61s
+   153| 0.505 73.0s |[29.46  45.59  ] | 1.40   1.76   182.01s
+   154| 0.505 73.6s |[29.45  45.59  ] | 1.40   1.76   181.87s
+   155| 0.504 73.2s | 29.45  45.60   | 1.40   1.76   182.21s
+   156| 0.504 73.3s |[29.43  45.57  ] | 1.40   1.76   182.27s
+   157| 0.504 71.2s | 29.44  45.59   | 1.40   1.76   182.86s
+   158| 0.504 73.6s | 29.44  45.59   | 1.40   1.76   181.75s
+   159| 0.504 72.9s | 29.44  45.59   | 1.40   1.76   182.38s
+   160| 0.504 74.1s | 29.44  45.59   | 1.40   1.76   182.45s
+   161| 0.504 73.5s | 29.44  45.58   | 1.40   1.76   182.47s
+   162| 0.504 73.7s |[29.43  45.58  ] | 1.39   1.76   182.29s
+   163| 0.504 73.8s | 29.43  45.58   | 1.39   1.76   182.36s
+   164| 0.503 74.1s | 29.43  45.58   | 1.39   1.76   181.63s
+   165| 0.503 72.7s |[29.41  45.56  ] | 1.39   1.76   182.03s
+   166| 0.503 73.6s | 29.42  45.57   | 1.39   1.76   183.05s
+   167| 0.503 71.2s |[29.41  45.55  ] | 1.39   1.76   182.34s
+   168| 0.503 72.0s | 29.42  45.57   | 1.39   1.76   181.58s
+   169| 0.503 73.7s |[29.41  45.56  ] | 1.39   1.76   182.32s
+   170| 0.503 67.7s |[29.40  45.55  ] | 1.39   1.76   181.51s
+   171| 0.503 64.6s | 29.41  45.56   | 1.39   1.76   182.16s
+   172| 0.503 68.8s | 29.41  45.55   | 1.39   1.76   181.76s
+   173| 0.502 72.2s |[29.40  45.55  ] | 1.39   1.75   181.44s
+   174| 0.502 73.7s |[29.38  45.54  ] | 1.39   1.75   181.50s
+   175| 0.502 71.8s | 29.40  45.55   | 1.39   1.75   181.65s
+   176| 0.502 71.6s | 29.40  45.55   | 1.39   1.75   181.48s
+   177| 0.502 72.9s | 29.39  45.53   | 1.39   1.75   181.00s
+   178| 0.502 73.1s | 29.39  45.54   | 1.39   1.75   182.06s
+   179| 0.502 72.5s |[29.38  45.53  ] | 1.39   1.75   182.15s
+   180| 0.502 72.9s | 29.39  45.54   | 1.39   1.75   181.76s
+   181| 0.503 73.3s | 29.72  46.09   | 1.39   1.75   182.22s
+   182| 0.503 73.5s | 29.72  46.10   | 1.39   1.75   183.67s
+   183| 0.503 72.0s | 29.71  46.07   | 1.39   1.75   183.50s
+   184| 0.503 73.3s | 29.71  46.08   | 1.39   1.75   183.47s
+   185| 0.503 72.5s | 29.69  46.06   | 1.39   1.75   182.97s
+   186| 0.502 72.5s | 29.70  46.07   | 1.39   1.75   183.24s
+   187| 0.503 60.0s | 29.83  46.27   | 1.39   1.76   184.18s
+   188| 0.503 63.7s | 29.81  46.24   | 1.39   1.76   182.27s
+   189| 0.503 73.2s | 29.80  46.22   | 1.39   1.76   182.47s
+   190| 0.503 62.8s | 29.81  46.25   | 1.39   1.76   182.66s
+predict_path = '/root/projects/DiffSTG/output/forecast/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2023_1ba297.pkl'
+ |[22.78  35.14  ] | 0.51   0.65   9744.31s
+sample_strategy:ddpm, sample_steps:200 Final results in test:22.78  35.14  15.82  0.08    254.36  | 191  

@@ -1,0 +1,36 @@
+[INFO] dataset=PEMS04 start_epoch=0 val_subset=512 gpu=0 max_hours=48
+[INFO] seeds=2022 2023 2024
+[INFO] runner=uv run --frozen --no-sync python
+[INFO] commit=913eb34
+[INFO] raw_log=output/log/run_3seeds_PEMS04_start0_20260830-155713.log
+[INFO] started at 2026-08-30T15:57:13+0800
+
+[INFO] === preflight ===
+[OK] data/dataset/PEMS04/flow.npy
+[OK] data/dataset/PEMS04/adj.npy
+[OK] timeout=/usr/bin/timeout
+
+[INFO] === smoke test (--is_test) ===
+[OK] smoke test passed at 2026-08-30T15:58:29+0800
+
+[INFO] === seeds ===
+
+[INFO] seed=2022 started at 2026-08-30T15:58:29+0800
+[OK] seed=2022 done at 2026-08-31T11:30:07+0800, elapsed=19:31:38
+
+[INFO] seed=2023 started at 2026-08-31T11:30:07+0800
+[OK] seed=2023 done at 2026-09-01T04:13:38+0800, elapsed=16:43:31
+
+[INFO] seed=2024 started at 2026-09-01T04:13:38+0800
+[OK] seed=2024 done at 2026-09-01T14:47:48+0800, elapsed=10:34:10
+
+[INFO] === summary ===
+[INFO] finished at 2026-09-01T14:47:49+0800, total elapsed=46:50:36
+[OK] all seeds completed: 2022 2023 2024
+[INFO] last rows of output/metrics/DiffSTG.csv:
+PEMS04,UGnet,200,UGnet,32,12,12,ddpm,200,0.1,8,2,0,0,512,2022,8,0.002,1e-05,10,True,15:58:28,3063.6206,3551.9534,4032.7292,9.81559191252056,11021.825,22.00061259046197,/root/projects/DiffSTG/output/model/test_PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e2_s2022_fa5c81.dm4stg,/root/projects/DiffSTG/output/log/test_PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e2_s2022_fa5c81.log,/root/projects/DiffSTG/output/forecast/test_PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e2_s2022_fa5c81.pkl
+PEMS04,UGnet,200,UGnet,32,12,12,ddpm,200,0.1,8,300,215,0,512,2022,8,0.002,1e-05,10,False,11:30:6,22.89415,35.271255,16.158966,0.08214535838679264,253.49034,9745.61595300585,/root/projects/DiffSTG/output/model/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2022_3cf0e0.dm4stg,/root/projects/DiffSTG/output/log/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2022_3cf0e0.log,/root/projects/DiffSTG/output/forecast/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2022_3cf0e0.pkl
+PEMS04,UGnet,200,UGnet,32,12,12,ddpm,200,0.1,8,300,179,0,512,2023,8,0.002,1e-05,10,False,4:13:37,22.782028,35.13765,15.818813,0.08167830893867895,254.35768,9744.312089197338,/root/projects/DiffSTG/output/model/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2023_1ba297.dm4stg,/root/projects/DiffSTG/output/log/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2023_1ba297.log,/root/projects/DiffSTG/output/forecast/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2023_1ba297.pkl
+PEMS04,UGnet,200,UGnet,32,12,12,ddpm,200,0.1,8,300,96,0,512,2024,8,0.002,1e-05,10,False,14:47:47,22.544613,34.95846,15.69462,0.08102269549118846,249.92854,9565.255587361753,/root/projects/DiffSTG/output/model/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2024_bd22b0.dm4stg,/root/projects/DiffSTG/output/log/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2024_bd22b0.log,/root/projects/DiffSTG/output/forecast/PEMS04_UGnet_N200_ss200_h32_bs8_lr0.002_se0_e300_s2024_bd22b0.pkl
+
+[INFO] === commit results ===
