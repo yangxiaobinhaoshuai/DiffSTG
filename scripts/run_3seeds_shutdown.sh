@@ -261,8 +261,10 @@ elif (( ${#failed[@]} == ${#seeds[@]} )) && (( SECONDS < 3600 )); then
 fi
 
 # ---- commit results on the host (push is manual) ---------------------------
-# Only output/metrics/*.csv and the tracked logs are staged; .gitignore keeps
-# checkpoints, forecast pickles and the raw transcript out.
+# Staged: output/metrics/*.csv, the tracked logs, the state file and the best-val
+# checkpoints (output/model/*.dm4stg -- tracked since d85584f, and unreproducible
+# once lost). .gitignore keeps the .last snapshots, the smoke-test models, the
+# forecast pickles and the raw transcript out.
 if (( early_fail )); then
   say '\n[INFO] no usable result; nothing committed.\n'
 elif [[ "${COMMIT_RESULTS:-1}" != "1" ]]; then
@@ -272,7 +274,7 @@ elif ! git rev-parse --git-dir >/dev/null 2>&1; then
 else
   say '\n[INFO] === commit results ===\n'
   write_state
-  git add -A -- output/metrics output/log "$state_file"
+  git add -A -- output/metrics output/log output/model "$state_file"
   if git diff --cached --quiet; then
     say '[WARN] nothing to commit under output/.\n'
   else

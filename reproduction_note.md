@@ -326,11 +326,12 @@ uv run --frozen --no-sync python scripts/test_from_checkpoint.py \
 | 内容 | 路径 | 进 git |
 | --- | --- | --- |
 | 最终指标 mae/rmse/mape/crps/mis（含 `seed`、`start_epoch`、`best_epoch` 列） | `output/metrics/DiffSTG.csv` | ✅ |
-| 每个 seed 的 epoch 级训练日志 | `output/log/*+<seed>.log` | ✅ |
+| 每个 seed 的 epoch 级训练日志 | `output/log/*_s<seed>_*.log` | ✅ |
 | 运行摘要（preflight / 每个 seed 起止与耗时 / 汇总） | `output/log/summary_3seeds_*.log` | ✅ |
 | 原始 transcript（实时 batch 级进度） | `output/log/run_3seeds_*.log` | ❌ |
-| best-val checkpoint | `output/model/*+<seed>*.dm4stg` | ❌ |
-| 预测样本 pickle（前 50 条，用于画图/重算概率指标） | `output/forecast/*+<seed>.pkl` | ❌ |
+| best-val checkpoint | `output/model/*_s<seed>_*.dm4stg` | ✅ |
+| 每 epoch 兜底快照 | `output/model/*.last.dm4stg` | ❌ |
+| 预测样本 pickle（前 50 条，用于画图/重算概率指标） | `output/forecast/*_s<seed>_*.pkl` | ❌ |
 
 关机前脚本会在 host 上把打 ✅ 的文件 commit 掉，但**不 push**（关机时机器可能没网，
 且推送是对外动作，留给你自己决定）。拿指标回本机：
@@ -381,8 +382,12 @@ git pull
 - **`MAX_HOURS` 墙钟上限**：卡死的训练不会一直烧 GPU。
 - **落盘校验**：每个 seed 结束后比对 CSV 行数，退出码为 0 但没写出结果也算失败。
 - **关机前 commit**：机器一关就拉不到文件了，所以指标和日志在关机前先落成一个 commit；
-  只 `git add` `output/metrics` 和 `output/log`，大文件靠 `.gitignore` 挡住。
+  `git add` 的是 `output/metrics`、`output/log`、`output/model` 和 `output/last_run.json`，
+  真正的大文件（`.last` 快照、forecast pickle、原始 transcript）靠 `.gitignore` 挡住。
   不自动 push：关机时机器未必有网，且推送是对外动作。
+  > 2026-09-01 补：`output/model` 是这天才加进去的。checkpoint 自 `d85584f` 起就该进 git，
+  > 但脚本的 `git add` 列表没跟着改，于是 PEMS04 跑完三个 best checkpoint 全是 untracked ——
+  > 那一轮如果按原计划跑完自动关机，它们就只留在 host 上。
 - **没结果就不关机**：关机是为了长跑结束后不空烧 GPU，但"什么都没跑出来"时关机只会把
   报错连同机器一起带走，只能重新开机翻日志。所以 preflight/冒烟失败、或三个 seed 在
   1 小时内全挂，都保持开机且不 commit。
