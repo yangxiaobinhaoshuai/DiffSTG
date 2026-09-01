@@ -55,7 +55,9 @@ PEMS03 估算 ~18 h 训练 + ~5 h test/seed，够。
 
 - [ ] 三数据集结果汇总表 -> `PROGRESS.md` + 论文
 - [ ] `git push`（结果在 host 提交，push 手动做；`git status -sb` 看积压几个）
-- [ ] 删 `/root/data_raw/`（48 MB 原始上传件，转换完就没用了）
+- [ ] 删 host 上的重复日志副本（27 MB，与 `run_3seeds_*.log` 字节相同，nohup 重定向留下的）：
+      `rm output/log/run_pems04.out output/log/run_pems08_rngfix.out`
+- [ ] 删 `/root/data_raw/`（47 MB 原始上传件，转换完就没用了）
 - [ ] 开源前：README 补数据获取说明（获取方式已写在 `reproduction_note.md`）
 
 ## 长期不做

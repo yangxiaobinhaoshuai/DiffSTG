@@ -385,11 +385,17 @@ uv run --frozen --no-sync python scripts/test_from_checkpoint.py \
 | --- | --- | --- |
 | 最终指标 mae/rmse/mape/crps/mis（含 `seed`、`start_epoch`、`best_epoch` 列） | `output/metrics/DiffSTG.csv` | ✅ |
 | 每个 seed 的 epoch 级训练日志 | `output/log/*_s<seed>_*.log` | ✅ |
+| 同一份日志的 MAE 副本（`train.py` 跑完 `shutil.copy` 出来的） | `output/log/*.maeXX.XX.log` | ❌ |
 | 运行摘要（preflight / 每个 seed 起止与耗时 / 汇总） | `output/log/summary_3seeds_*.log` | ✅ |
 | 原始 transcript（实时 batch 级进度） | `output/log/run_3seeds_*.log` | ❌ |
+| 原始 transcript 的 nohup 副本（与上一行字节相同） | `output/log/run_*.out` | ❌ |
 | best-val checkpoint | `output/model/*_s<seed>_*.dm4stg` | ✅ |
 | 每 epoch 兜底快照 | `output/model/*.last.dm4stg` | ❌ |
 | 预测样本 pickle（前 50 条，用于画图/重算概率指标） | `output/forecast/*_s<seed>_*.pkl` | ❌ |
+
+两份 ❌ 的副本都是同一内容的第二份拷贝，留在 host 上纯属方便（`ls` 里一眼看见 MAE、
+`tail` 有个短路径），删掉不丢任何信息。`.maeXX.XX.log` 曾有 7 个进了 git（`be2090e` 起
+不再跟踪）——CSV 的 `log_path` 和 `last_run.json` 指的一直是原始 `.log`。
 
 关机前脚本会在 host 上把打 ✅ 的文件 commit 掉，但**不 push**（关机时机器可能没网，
 且推送是对外动作，留给你自己决定）。拿指标回本机：
