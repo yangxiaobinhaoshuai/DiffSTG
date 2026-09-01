@@ -33,6 +33,8 @@ output/*
 output/log/*
 !output/log/*.log
 output/log/run_3seeds_*.log
+# smoke-test logs (--is_test, 2 epochs); the run they belong to is not a result
+output/log/test_*.log
 output/metrics/*
 !output/metrics/*.csv
 

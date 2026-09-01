@@ -16,6 +16,8 @@ DATASET=PEMS03 \
 
 - [ ] 起跑，确认 `PPID=1` 且 GPU 上来了
 - [ ] 跑完核对 CSV 里三行 `PEMS03` + `ddpm`/200，算 mean±std
+- [ ] 删掉 CSV 里那行冒烟结果（`is_test=True`、`epoch=2`，MAE 几千那行）——
+      脚本会把它一起 commit 进去，冒烟日志已由 `.gitignore` 挡掉，CSV 得手工删
 - [ ] 更新 `PROGRESS.md` 的进度表和结果表
 
 **必须 `setsid`。** 2026-08-30 seed 2024 的补测就是只挂在 tmux 里，shell 一关整个进程被带走，
